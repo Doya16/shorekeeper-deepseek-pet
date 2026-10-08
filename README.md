@@ -21,7 +21,7 @@
 ## 开始使用
 
 1. 从 [DeepSeek 官网](https://www.deepseek.com/harness/) 下载 Windows 客户端，启动并登录。
-2. 下载 **Shorekeeper-DeepSeek-Windows-v0.1.0.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
+2. 下载 **Shorekeeper-DeepSeek-Windows-v0.1.1.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
 3. 从 DeepSeek 托盘菜单完全退出客户端。桌宠右键 → **外观、声音与迁移 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件**。
 4. 重新打开 Harness，开始任务。桌宠自动跟随最近活动的会话。
 

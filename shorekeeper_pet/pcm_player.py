@@ -1,7 +1,9 @@
 """Play complete PCM buffers through QAudioSink, bypassing Media Foundation."""
 import wave
-from PySide6.QtCore import QObject,Signal,QUrl,QBuffer,QByteArray,QIODevice
+from PySide6.QtCore import QObject,Signal,QUrl,QBuffer,QByteArray,QIODevice,QTimer
 from PySide6.QtMultimedia import QAudioSink,QAudioFormat,QMediaDevices,QAudio,QMediaPlayer
+from .paths import ROOT,AUDIO_SESSION_NAME,APPLICATION_ID
+from .windows_audio import set_session_identity
 
 class PcmPlayer(QObject):
     mediaStatusChanged=Signal(object)
@@ -9,6 +11,8 @@ class PcmPlayer(QObject):
     def __init__(self,parent=None):
         super().__init__(parent); self.sink=None; self.buffer=None; self.running=False
         self._duration=0; self._position=0; self._volume=.75; self._error=QMediaPlayer.Error.NoError; self._source=QUrl(); self.samples=b''
+        self._identity_timer=QTimer(self); self._identity_timer.setSingleShot(True)
+        self._identity_timer.timeout.connect(self._label_session); self._identity_attempts=0
     def source(self): return self._source
     def error(self): return self._error
     def duration(self): return self._duration
@@ -18,6 +22,7 @@ class PcmPlayer(QObject):
         self._volume=max(0,min(1,value))
         if self.sink: self.sink.setVolume(self._volume)
     def stop(self):
+        self._identity_timer.stop()
         self.running=False; self._position=0
         if self.sink: self.sink.stop(); self.sink.deleteLater(); self.sink=None
         if self.buffer: self.buffer.close(); self.buffer.deleteLater(); self.buffer=None
@@ -59,6 +64,12 @@ class PcmPlayer(QObject):
         self.buffer=QBuffer(self); self.buffer.setData(QByteArray(data)); self.buffer.open(QIODevice.OpenModeFlag.ReadOnly)
         self.sink=QAudioSink(device,fmt,self); self.sink.setVolume(self._volume); self.sink.stateChanged.connect(self._state)
         self.running=True; self.sink.start(self.buffer)
+        self._identity_attempts=0; self._label_session()
+    def _label_session(self):
+        if not self.running: return
+        self._identity_attempts+=1
+        named=set_session_identity(AUDIO_SESSION_NAME,ROOT/'assets/shorekeeper.ico',APPLICATION_ID)
+        if not named and self._identity_attempts<3: self._identity_timer.start(150)
     def _state(self,state):
         if not self.running: return
         if state==QAudio.State.IdleState and self.buffer.atEnd():
