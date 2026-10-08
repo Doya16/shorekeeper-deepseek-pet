@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory() as td:
 
     companion.set_binding('idle',asset='p2-31',audio_clips=[],bubble_mode='custom',bubble_text='守岸人，这个称呼就很好。它表示，某种因你而有的意义和决心。',bubble_seconds=0)
     companion.options['audio_enabled']=False; companion.react('idle')
-    companion.quota_data=dict(windows=[dict(remaining=65,label='每周',name='codex',resets_at=time.time()+600)],updated_at=time.time(),source='live')
+    companion.quota_data=dict(windows=[dict(remaining=65,label='每周',name='deepseek',resets_at=time.time()+600)],updated_at=time.time(),source='live')
     companion.update_layout(); area=app.primaryScreen().availableGeometry()
     for x in [area.left(),area.right()]:
         companion.move(x,area.top()+300); companion.clamp_position(); companion.update_bubble(); app.processEvents()

@@ -1,4 +1,4 @@
-"""Shorekeeper: a transparent Windows desktop companion for Codex."""
+"""Shorekeeper: a transparent Windows desktop companion for DeepSeek."""
 from __future__ import annotations
 import argparse, collections, json, math, os, pathlib, random, sys, threading, time
 from datetime import datetime
@@ -15,7 +15,7 @@ from .audio_player import VoicePlayer
 from .config_io import save_atomic,migrate_settings
 from .renderer import PetRenderer,SpeechBubble
 from .binding_editor import TRIGGERS
-from .paths import VERSION,CODEX_HOME
+from .paths import VERSION,DSH_HOME
 from .voice_pool import task_key,clip_bubble_text
 from .sizing import SizeDialog,normalize_scale
 from .presentation_size import EdgeResize
@@ -29,9 +29,9 @@ STATES={
  'reading':('查阅中','我去翻翻资料，马上回来。'),
  'writing':('编辑中','正在把想法写下来，一笔一笔来。'),
  'working':('执行中','工具还在工作，我替你守着。'),
- 'waiting':('等你回应','有件事需要你看看，回到 Codex 回复一下吧。'),
+ 'waiting':('等你回应','有件事需要你看看，回到 DeepSeek 回复一下吧。'),
  'done':('完成啦','这一步做好了，去看看结果吧！'),
- 'error':('遇到问题','这里有个小状况，回到 Codex 看看详情吧。'),
+ 'error':('遇到问题','这里有个小状况，回到 DeepSeek 看看详情吧。'),
  'paused':('已暂停','先歇一会儿，准备好再继续。'),
  'unknown':('等待更新','暂时没有新的状态，任务可能仍在运行。'),
  'pet':('摸摸头','唔……有你陪着，今天也要好好加油。'),
@@ -110,7 +110,7 @@ class Panel(QDialog):
         size_button=QPushButton('调整大小…'); size_button.clicked.connect(pet.open_size); appearance.addWidget(size_button); layout.addLayout(appearance)
         options=QHBoxLayout(); self.quiet=QCheckBox('安静陪伴'); self.quiet.setChecked(pet.quiet); self.quiet.toggled.connect(pet.set_quiet); options.addWidget(self.quiet)
         self.top=QCheckBox('保持置顶'); self.top.setChecked(pet.on_top); self.top.toggled.connect(pet.set_top); options.addWidget(self.top); options.addStretch(); layout.addLayout(options)
-        self.notes=QCheckBox('在气泡里显示 Codex 已公开的进度文字'); self.notes.setChecked(pet.show_notes); self.notes.toggled.connect(pet.set_notes); layout.addWidget(self.notes)
+        self.notes=QCheckBox('在气泡里显示当前状态提示'); self.notes.setChecked(pet.show_notes); self.notes.toggled.connect(pet.set_notes); layout.addWidget(self.notes)
         bindings_button=QPushButton('自定义 GIF 绑定 · 为每种交互选择表情'); bindings_button.setStyleSheet('background:#e5eeff;color:#2c5287;font-weight:600;padding:11px;'); bindings_button.clicked.connect(pet.open_bindings); layout.addWidget(bindings_button)
         preferences=QPushButton('外观、声音与迁移 · 字体 / 音频 / 导出'); preferences.clicked.connect(pet.open_preferences); layout.addWidget(preferences)
         library=QGroupBox('表情收藏 · 83 个原始 GIF'); lib=QVBoxLayout(library)
@@ -119,7 +119,7 @@ class Panel(QDialog):
         lib.addWidget(self.gallery); buttons=QHBoxLayout()
         preview=QPushButton('播放这个表情'); preview.clicked.connect(lambda:pet.preview(self.gallery.currentData())); buttons.addWidget(preview)
         reset=QPushButton('回到任务状态'); reset.clicked.connect(pet.clear_override); buttons.addWidget(reset); lib.addLayout(buttons); layout.addWidget(library)
-        bottom=QHBoxLayout(); go=QPushButton('回到 Codex 会话'); go.clicked.connect(pet.open_codex); bottom.addWidget(go)
+        bottom=QHBoxLayout(); go=QPushButton('打开 DeepSeek Harness'); go.clicked.connect(pet.open_deepseek); bottom.addWidget(go)
         hide=QPushButton('收起面板'); hide.clicked.connect(self.hide); bottom.addWidget(hide); layout.addLayout(bottom)
         footer=QLabel('单击摸头 · 拖动移动 · 右键菜单\n额度每 2 分钟更新；任务状态来自本地会话。'); footer.setStyleSheet('color:#7b8ba2;'); layout.addWidget(footer)
         self.update_threads(pet.thread_list); self.refresh()
@@ -161,7 +161,7 @@ class Pet(PetRenderer,QWidget):
         if self.on_top: flags|=Qt.WindowType.WindowStaysOnTopHint
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setWindowTitle('守岸人 · Codex 桌宠')
+        self.setWindowTitle('守岸人 · DeepSeek 桌宠')
         self.setMouseTracking(True)
         self.resize(round(340*self.scale_factor),round(438*self.scale_factor))
         self.cache=collections.OrderedDict(); self.animation_id=self.binding('idle')['asset']; self.animation=self.get_animation(self.animation_id)
@@ -173,8 +173,8 @@ class Pet(PetRenderer,QWidget):
         self.live_status={'state':'idle','message':'','title':''}
         self.notifications=collections.deque(); self.notification=None; self.notification_until=0; self.notification_seen=set()
         self.quota_data={}; self.thread_list=[]; self.panel=None; self.binding_editor=None
-        self.monitor=Monitor(self.options['codex_home'] or CODEX_HOME); self.monitor.selected=self.settings.get('thread','auto')
-        self.rate_client=RateClient(self.options['codex_executable'],self.options['codex_home']); self.worker=BridgeWorker(); self.stop_event=threading.Event(); self.refresh_event=threading.Event()
+        self.monitor=Monitor(self.options['deepseek_home'] or DSH_HOME); self.monitor.selected=self.settings.get('thread','auto')
+        self.rate_client=RateClient(self.options['deepseek_executable'],self.options['deepseek_home']); self.worker=BridgeWorker(); self.stop_event=threading.Event(); self.refresh_event=threading.Event()
         self.voice=VoicePlayer(ROOT,self); self.preview_audio_clip=None
         self.bubble_window=SpeechBubble(self); self.voice.changed.connect(self.on_voice_changed)
         self.worker.status.connect(self.on_status); self.worker.quota.connect(self.on_quota); self.worker.threads.connect(self.on_threads)
@@ -186,8 +186,8 @@ class Pet(PetRenderer,QWidget):
         self.icon=QIcon(str(ROOT/'assets/shorekeeper.ico'))
         if self.icon.isNull(): self.icon=QIcon(QPixmap.fromImage(icon_im))
         self.setWindowIcon(self.icon); QApplication.instance().setWindowIcon(self.icon)
-        self.tray=QSystemTrayIcon(self.icon,self); self.tray.setToolTip('守岸人 · 点击唤醒/隐藏')
-        menu=QMenu(); menu.addAction('显示 / 隐藏',self.toggle_visible); menu.addAction('调整大小…',self.open_size); menu.addAction('自动跟随当前任务',lambda:self.select_thread('auto')); menu.addAction('陪伴面板',self.open_panel); menu.addAction('交互工作室',self.open_bindings); menu.addAction('外观、声音与迁移',self.open_preferences); menu.addAction('刷新额度',self.refresh_quota); menu.addSeparator(); menu.addAction('退出守岸人',self.shutdown); self.tray.setContextMenu(menu)
+        self.tray=QSystemTrayIcon(self.icon,self); self.tray.setToolTip('守岸人 · DeepSeek · 点击唤醒/隐藏')
+        menu=QMenu(); menu.addAction('显示 / 隐藏',self.toggle_visible); menu.addAction('调整大小…',self.open_size); menu.addAction('自动跟随当前任务',lambda:self.select_thread('auto')); menu.addAction('陪伴面板',self.open_panel); menu.addAction('交互工作室',self.open_bindings); menu.addAction('外观、声音与迁移',self.open_preferences); menu.addAction('刷新余额',self.refresh_quota); menu.addSeparator(); menu.addAction('退出守岸人',self.shutdown); self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda reason:self.toggle_visible() if reason==QSystemTrayIcon.ActivationReason.Trigger else None)
         if not offline: self.tray.show()
         self.timer=QTimer(self); self.timer.setInterval(25); self.timer.timeout.connect(self.tick); self.timer.start()
@@ -251,12 +251,12 @@ class Pet(PetRenderer,QWidget):
     def watch_status(self):
         while not self.stop_event.is_set():
             try:
-                target=pathlib.Path(self.options['codex_home'] or CODEX_HOME)
+                target=pathlib.Path(self.options['deepseek_home'] or DSH_HOME)
                 if self.monitor.home!=target:
                     self.monitor=Monitor(target); self.monitor.selected=self.settings.get('thread','auto')
                 self.worker.status.emit(self.monitor.poll())
                 self.worker.threads.emit(self.monitor.threads.copy())
-                if not self.quota_data and self.monitor.cached_rate(): self.worker.quota.emit(self.monitor.cached_rate())
+                if self.monitor.cached_rate(): self.worker.quota.emit(self.monitor.cached_rate())
             except Exception:
                 self.worker.status.emit(dict(state='unknown',message='',title='',stale=True))
             self.stop_event.wait(1)
@@ -265,8 +265,8 @@ class Pet(PetRenderer,QWidget):
         while not self.stop_event.is_set():
             self.refresh_event.clear()
             try:
-                if (self.rate_client.executable,self.rate_client.codex_home)!=(self.options['codex_executable'],self.options['codex_home']):
-                    self.rate_client.close(); self.rate_client=RateClient(self.options['codex_executable'],self.options['codex_home'])
+                if (self.rate_client.executable,self.rate_client.deepseek_home)!=(self.options['deepseek_executable'],self.options['deepseek_home']):
+                    self.rate_client.close(); self.rate_client=RateClient(self.options['deepseek_executable'],self.options['deepseek_home'])
                 self.worker.quota.emit(self.rate_client.read())
             except Exception:
                 self.worker.quota.emit(dict(error='刷新暂时失败，显示最近记录。'))
@@ -356,19 +356,14 @@ class Pet(PetRenderer,QWidget):
         self.update()
 
     def quota_label(self,compact=False):
-        q=self.quota_data
-        if not q.get('windows'): return '算力配额：--' if compact else ('额度读取中…' if not q.get('error') else '额度暂不可用')
-        w=min(q['windows'],key=lambda row:row['remaining'])
-        stale=time.time()-q.get('updated_at',0)>300 or q.get('error')
-        label=f"算力配额：{w['remaining']:g}%" if compact else f"{w['label']}剩余 {w['remaining']:g}%"
-        return label+(' *' if compact else ' · 缓存') if stale or q.get('source')!='live' else label
+        from .bridge import balance_label
+        return balance_label(self.quota_data,compact)
 
     def quota_details(self):
         lines=[self.quota_label()]
-        for window in self.quota_data.get('windows',[]):
-            reset=datetime.fromtimestamp(window['resets_at']).astimezone().strftime('%m/%d %H:%M') if window.get('resets_at') else '未知'
-            lines.append(f"{window.get('name','Codex')} · {window['label']}剩余 {window['remaining']:g}% · 重置 {reset}")
-        return '\n'.join(lines)+'\n* 表示缓存记录\n拖动配额条左右两侧调整大小\n右键 → 刷新额度；Ctrl + 滚轮缩放桌宠'
+        for wallet in self.quota_data.get('wallets',[]):
+            lines.append(('赠送余额' if wallet['bonus'] else '充值余额')+' · '+wallet['currency']+' '+wallet['balance'])
+        return '\n'.join(lines)+'\n包含充值与赠送余额；* 表示缓存或刷新失败\n拖动左右两侧调整大小；右键 → 刷新余额'
 
     def bubble_text(self):
         if hasattr(self,'bubble_window') and self.bubble_window.edge_resize.active: return self.bubble_window.edge_resize.text
@@ -456,7 +451,7 @@ class Pet(PetRenderer,QWidget):
         menu.addAction('调整大小…',self.open_size)
         menu.addAction('外观、声音与迁移',self.open_preferences)
         follow=menu.addAction('自动跟随当前任务',lambda:self.select_thread('auto')); follow.setCheckable(True); follow.setChecked(self.monitor.selected=='auto')
-        menu.addAction('刷新额度',self.refresh_quota); menu.addAction('回到当前 Codex 会话',self.open_codex)
+        menu.addAction('刷新余额',self.refresh_quota); menu.addAction('打开 DeepSeek Harness',self.open_deepseek)
         quiet=menu.addAction('安静陪伴'); quiet.setCheckable(True); quiet.setChecked(self.quiet); quiet.triggered.connect(self.set_quiet)
         menu.addSeparator(); menu.addAction('暂时收起（托盘恢复）',self.hide); menu.addAction('退出守岸人',self.shutdown); return menu
 
@@ -496,13 +491,13 @@ class Pet(PetRenderer,QWidget):
         path=pathlib.Path(self.options['audio_directory'] or 'audio'); return path if path.is_absolute() else ROOT/path
 
     def set_option(self,key,value):
-        if key=='launch_with_codex' and not self.offline:
+        if key=='launch_with_deepseek' and not self.offline:
             from .startup import configure
             configure(bool(value),ROOT)
         self.options[key]=value; self.settings['appearance']=dict(self.options); self.options=appearance(self.settings)
         ok=self.save_settings(); self.apply_style(); self.update_layout(); self.update()
         if key=='audio_enabled' and not value: self.voice.stop()
-        if key.startswith('codex'): self.refresh_event.set()
+        if key.startswith('deepseek'): self.refresh_event.set()
         return ok
 
     def quota_hit_rect(self):
@@ -530,7 +525,7 @@ class Pet(PetRenderer,QWidget):
         data=migrate_settings(data)
         if not self.offline:
             from .startup import configure
-            configure(appearance(data)['launch_with_codex'],ROOT)
+            configure(appearance(data)['launch_with_deepseek'],ROOT)
         self.settings=data; self.pack=data.get('pack','163')
         if self.pack not in PACKS: self.pack='163'
         self.refresh_assets()
@@ -580,11 +575,11 @@ class Pet(PetRenderer,QWidget):
         if not self.panel: self.panel=Panel(self)
         self.panel.refresh(); self.panel.show(); self.panel.raise_(); self.panel.activateWindow()
 
-    def open_codex(self):
-        from PySide6.QtGui import QDesktopServices
-        from PySide6.QtCore import QUrl
-        tid=self.live_status.get('thread_id')
-        QDesktopServices.openUrl(QUrl('codex://threads/'+tid if tid else 'codex://'))
+    def open_deepseek(self):
+        import subprocess
+        from .bridge import discover_deepseek
+        executable=discover_deepseek(self.options['deepseek_executable'])
+        if executable: subprocess.Popen([executable])
 
     def toggle_visible(self):
         if self.isVisible(): self.hide()
@@ -599,7 +594,7 @@ class Pet(PetRenderer,QWidget):
         event.ignore(); self.hide()
 
     def write_health(self):
-        data=dict(version=VERSION,pid=os.getpid(),updated_at=time.time(),state=self.state,visible=self.isVisible(),quota_source=self.quota_data.get('source'),quota_updated_at=self.quota_data.get('updated_at'),quota_available=bool(self.quota_data.get('windows')),rate_error=self.quota_data.get('error'),thread_count=len(self.thread_list),animation=self.animation_id,custom_bindings=len(self.bindings.overrides),font=self.options['bubble_font_family'])
+        data=dict(version=VERSION,pid=os.getpid(),updated_at=time.time(),state=self.state,visible=self.isVisible(),quota_source=self.quota_data.get('source'),quota_updated_at=self.quota_data.get('updated_at'),quota_available=bool(self.quota_data.get('wallets')),rate_error=self.quota_data.get('error'),thread_count=len(self.thread_list),animation=self.animation_id,custom_bindings=len(self.bindings.overrides),font=self.options['bubble_font_family'])
         data.update(follow=self.monitor.selected,thread_id=self.live_status.get('thread_id'),live_state=self.live_status.get('state'),owner=self.controller.owner,scale=self.requested_scale,display_scale=self.scale_factor,window_size=[self.width(),self.height()])
         try:
             (ROOT/'runtime.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
@@ -608,20 +603,20 @@ class Pet(PetRenderer,QWidget):
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--preview',action='store_true'); parser.add_argument('--smoke-test',action='store_true'); parser.add_argument('--capture-after',type=int,default=0); parser.add_argument('--bindings',action='store_true'); parser.add_argument('--settings',action='store_true'); parser.add_argument('--verify-package',action='store_true'); parser.add_argument('--verify-connection',action='store_true'); args=parser.parse_args()
     if args.verify_connection:
-        from .bridge import discover_codex
-        opts=appearance(load_settings()); monitor=Monitor(opts['codex_home'] or CODEX_HOME); client=RateClient(opts['codex_executable'],opts['codex_home'])
+        from .bridge import discover_deepseek
+        opts=appearance(load_settings()); monitor=Monitor(opts['deepseek_home'] or DSH_HOME); client=RateClient(opts['deepseek_executable'],opts['deepseek_home'])
         try:
             status=monitor.poll(); quota=client.read()
-            report=dict(version=VERSION,frozen=bool(getattr(sys,'frozen',False)),codex_detected=bool(discover_codex(opts['codex_executable'])),quota_available=bool(quota.get('windows')),thread_count=len(monitor.threads),state=status['state'],follow=monitor.selected)
+            report=dict(version=VERSION,frozen=bool(getattr(sys,'frozen',False)),deepseek_detected=bool(discover_deepseek(opts['deepseek_executable'])),quota_available=bool(quota.get('wallets')),thread_count=len(monitor.threads),state=status['state'],follow=monitor.selected)
             (ROOT/'connection-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
-            return 0 if report['codex_detected'] and report['quota_available'] else 1
+            return 0 if report['deepseek_detected'] and report['quota_available'] else 1
         finally: client.close()
     app=QApplication(sys.argv); app.setApplicationName('Shorekeeper'); app.setQuitOnLastWindowClosed(False)
     lock=QLockFile(str(ROOT/'pet.lock')); lock.setStaleLockTime(0)
     if not args.preview and not args.smoke_test and not args.verify_package and not lock.tryLock(100): return 0
     if not args.preview and not args.smoke_test and not args.verify_package:
         from .startup import configure
-        if appearance(load_settings())['launch_with_codex']:
+        if appearance(load_settings())['launch_with_deepseek']:
             try:configure(True,ROOT)
             except OSError:pass
     pet=Pet(offline=args.preview or args.smoke_test or args.verify_package); pet.show()
@@ -647,10 +642,10 @@ def main():
                 bubble_bounds=pet.bubble_window.width()<=pet.screen_area().width()
                 audio_mode=pet.binding_editor.controls['bubble_mode'].findText('自定义音频+字幕')>=0
                 resize_controls=all(key in pet.size_dialog.presentation_control.controls for key in ('bubble_width_ratio','quota_scale'))
-                from .startup import codex_processes
+                from .startup import deepseek_processes
                 frequency_controls=all(pet.binding_editor.controls['audio_policy'].findData(mode)>=0 for mode in ('entry','session','occasional','turn'))
-                startup_control='launch_with_codex' in pet.preferences.controls
-                desktop_detected=bool(codex_processes())
+                startup_control='launch_with_deepseek' in pet.preferences.controls
+                desktop_detected=bool(deepseek_processes())
                 report=dict(ok=len(pet.font_families)>=2 and decoder_ok and output_ok and bubble_bounds and audio_mode and resize_controls and frequency_controls and startup_control,audio_decoder=decoder_ok,audio_output=output_ok,bubble_bounds=bubble_bounds,audio_subtitle_mode=audio_mode,resize_controls=resize_controls,voice_frequency_controls=frequency_controls,startup_control=startup_control,desktop_detected=desktop_detected,version=VERSION,fonts=pet.font_families,assets=len(ASSETS),bindings=len(pet.bindings.overrides),root=str(ROOT),frozen=bool(getattr(sys,'frozen',False)),scale=pet.requested_scale,size_control_percent=pet.size_dialog.control.percent.value())
                 (ROOT/'package-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
             except Exception:
@@ -662,7 +657,7 @@ def main():
     if args.smoke_test:
         (ROOT/'qa').mkdir(exist_ok=True)
         pet.live_status=dict(state='working',message='正在整理素材并检查动画循环。',title='守岸人桌宠',stale=False)
-        pet.quota_data=dict(windows=[dict(remaining=81,label='每周',name='codex',resets_at=1791655436)],updated_at=time.time(),source='demo')
+        pet.quota_data=dict(windows=[dict(remaining=81,label='每周',name='deepseek',resets_at=1791655436)],updated_at=time.time(),source='demo',wallets=[dict(currency='CNY',balance='12.34',bonus=False)])
         def capture():
             pet.transition_old=None; pet.tick(); pet.grab().save(str(ROOT/'qa/desktop-preview.png'))
             pet.open_panel(); pet.panel.grab().save(str(ROOT/'qa/panel-preview.png')); app.exit(0)

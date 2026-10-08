@@ -15,7 +15,7 @@ def verify(folder):
     sizes=[(blob[6+i*14] or 256,blob[7+i*14] or 256) for i in range(count)]
     assert {16,24,32,48,64,128,256}=={s[0] for s in sizes},sizes
     strings={k.decode():v.decode('utf8') for info in pe.FileInfo for block in info if hasattr(block,'StringTable') for table in block.StringTable for k,v in table.entries.items()}
-    assert strings['OriginalFilename']==EXECUTABLE_NAME and strings['FileVersion']==VERSION,strings
+    assert strings['OriginalFilename']==EXECUTABLE_NAME and strings['FileVersion']==VERSION.split('-')[0],strings
     extract=ctypes.windll.shell32.ExtractIconExW
     extract.argtypes=[wintypes.LPCWSTR,ctypes.c_int,ctypes.POINTER(wintypes.HICON),ctypes.POINTER(wintypes.HICON),wintypes.UINT]
     extract.restype=wintypes.UINT

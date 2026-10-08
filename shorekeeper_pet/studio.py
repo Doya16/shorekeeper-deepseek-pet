@@ -51,7 +51,7 @@ class BindingEditor(QDialog):
         play.addRow('单次播完后再停留',self.number('hold_seconds',0,600,.5,' 秒'))
         play.addRow('循环总时长',self.number('loop_seconds',0,3600,.5,' 秒',zero='持续到下一次事件'))
         self.next_state=self.combo('next_state',[('回到当前任务 / 待机','auto'),('保持此状态，直到新事件','hold')]+[(label,state) for state,(label,_) in TRIGGERS.items()]); play.addRow('播放结束后切换到',self.next_state)
-        interrupt=QCheckBox('允许新的 Codex 状态提前打断'); self.controls['interruptible']=interrupt; interrupt.toggled.connect(lambda v:self.change('interruptible',v)); play.addRow(interrupt)
+        interrupt=QCheckBox('允许新的 DeepSeek 状态提前打断'); self.controls['interruptible']=interrupt; interrupt.toggled.connect(lambda v:self.change('interruptible',v)); play.addRow(interrupt)
         desc=QLabel('单次：完整播放一遍，再等待设置的秒数。\n循环：总时长为 0 时持续播放；拖动松开、鼠标移开仍会结束相应交互。'); desc.setWordWrap(True); play.addRow(desc)
         self.timing=QLabel(); self.timing.setWordWrap(True); play.addRow(self.timing)
         bubble=self.form_tab('气泡与字体')

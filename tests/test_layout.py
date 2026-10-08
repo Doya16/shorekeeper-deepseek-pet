@@ -23,6 +23,9 @@ class LayoutTests(unittest.TestCase):
             files={EXECUTABLE_NAME:b'MZ test','_internal/qt.dll':b'qt',
                 'shorekeeper_pet/__init__.py':b'', 'shorekeeper_pet/pet.py':b'# pet',
                 'tools/run_pet.py':b'# entry','tools/创建桌面快捷方式.cmd':b'entry',
+                'tools/install_deepseek_plugin.ps1':b'# install',
+                'integrations/deepseek/index.js':b'// plugin',
+                'integrations/deepseek/dsh-shorekeeper-pet-0.1.1.tgz':b'package',
                 'docs/USAGE.md':b'guide','assets/originals/a.gif':b'GIF89a'}
             for name,data in files.items():
                 p=root/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(data)

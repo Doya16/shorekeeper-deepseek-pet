@@ -1,4 +1,4 @@
-"""Atomic config snapshots and portable exports. Never includes Codex account data."""
+"""Atomic config snapshots and portable exports. Never includes DeepSeek account data."""
 import copy,hashlib,json,os,pathlib,re,shutil,tempfile,time,zipfile
 from .audio_player import resolve_audio,AUDIO_EXTS
 from .voice_pool import clips_for,clip_bubble_text
@@ -6,6 +6,10 @@ from .paths import EXECUTABLE_NAME,PORTABLE_DIRNAME
 
 def migrate_settings(settings):
     result=copy.deepcopy(settings); version=result.get('schema_version',0)
+    options=result.setdefault('appearance',{})
+    # Codex appearance/media imports work without carrying its connection settings.
+    for key in ('codex_home','codex_executable','launch_with_codex'):
+        options.pop(key,None)
     legacy=not isinstance(version,int) or version<7; result['schema_version']=7
     bindings=result.get('bindings',{})
     if isinstance(bindings,dict):
@@ -71,7 +75,7 @@ def bundle_payload(settings,root,portable=False):
     options['audio_directory']='audio'
     if portable:
         result['thread']='auto'; result.pop('position',None)
-        options['codex_home']=''; options['codex_executable']=''
+        options['deepseek_home']=''; options['deepseek_executable']=''
     return result,files,warnings
 
 def export_bundle(destination,settings,root,portable=False):
@@ -83,8 +87,11 @@ def export_bundle(destination,settings,root,portable=False):
         files[EXECUTABLE_NAME]=runtime/EXECUTABLE_NAME
         for file in (runtime/'_internal').rglob('*'):
             if file.is_file(): files[file.relative_to(runtime).as_posix()]=file
-        for name in ('README.md','MIGRATION.txt','THIRD_PARTY.txt','requirements.txt','tools/创建桌面快捷方式.cmd','tools/run_pet.py','tools/create_shortcut.ps1'):
+        for name in ('README.md','MIGRATION.txt','THIRD_PARTY.txt','requirements.txt','tools/创建桌面快捷方式.cmd','tools/run_pet.py','tools/create_shortcut.ps1','tools/install_deepseek_plugin.ps1'):
             if (root/name).is_file(): files[name]=root/name
+        for name in ('package.json','index.js','state.js','cordis.patch.yml','dsh-shorekeeper-pet-0.1.1.tgz'):
+            path=root/'integrations/deepseek'/name
+            if path.is_file(): files[path.relative_to(root).as_posix()]=path
         for file in (root/'shorekeeper_pet').glob('*.py'): files[file.relative_to(root).as_posix()]=file
         for file in (root/'docs').rglob('*'):
             if file.is_file() and file.suffix.lower() in ('.md','.png','.jpg','.gif'): files[file.relative_to(root).as_posix()]=file

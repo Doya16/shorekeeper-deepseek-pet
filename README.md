@@ -1,151 +1,62 @@
-<!-- README language switch -->
-[![中文](https://img.shields.io/badge/%E4%B8%AD%E6%96%87-1677ff?style=for-the-badge)](README.md) [![English](https://img.shields.io/badge/English-555555?style=for-the-badge)](README.en.md)
-<!-- /README language switch -->
+# 守岸人 DeepSeek 桌宠
 
-<div align="center">
+让守岸人陪你使用 **DeepSeek Harness 官方 Windows 客户端**。基于守岸人 Codex 桌宠的独立预览版，两版可以分别配置。
 
-# 守岸人 Codex 桌宠
+## 开始使用
 
-**跟随 Codex 任务切换表情，支持自定义 GIF、语音和气泡台词。**
+1. 从 [DeepSeek 官网](https://www.deepseek.com/harness/) 下载 Windows 客户端，启动并登录。
+2. 解压桌宠便携包，双击 **守岸人DeepSeek桌宠启动.exe**。
+3. 从 DeepSeek 托盘菜单完全退出客户端。桌宠右键 → **外观、声音与迁移 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件**。
+4. 重新打开 Harness，开始任务。桌宠自动跟随最近活动的会话。
 
-[下载 Windows 版](https://github.com/Doya16/shorekeeper-codex-pet/releases/latest) · [观看演示](https://github.com/Doya16/shorekeeper-codex-pet/releases/download/v0.9.1/shorekeeper-landscape-v091.mp4) · [使用指南](docs/USAGE.md) · [问题反馈](https://github.com/Doya16/shorekeeper-codex-pet/issues)
+更新连接插件时重复第 3、4 步。无需额外填写 API Key。兼容验证目标：DeepSeek Harness 0.2.0-rc.2 / Windows x64。
 
-![守岸人 Codex 桌宠](docs/social/cover-landscape.jpg)
+## 可以做什么
 
-</div>
+- **看任务状态**：思考、查阅、编辑、执行、等你回应、完成、报错和暂停使用不同 GIF。多个会话完成后分别排队提醒。
+- **搭配语音与字幕**：一个动作添加多条音频，每条单独配台词，随机播放；完整播完再切换提醒。思考默认每轮只播一次，待机可选择每次、每次启动一次或偶尔播放。
+- **自由设置动画**：从三套共 83 个 GIF 中选择，或打开素材目录加入 GIF、动态 WebP、PNG、JPG/JPEG；设置速度、循环、单次播放及结束后的去向。
+- **调整大小**：Ctrl + 滚轮缩放桌宠；拖动气泡或余额条左右边缘调整尺寸；字体、字号和气泡宽度可预览，随桌宠一起缩放。
+- **桌面互动**：摸头、双击、拖动、放下、悬停、投喂均可单独绑定 GIF、音频和气泡。
+- **查看账户余额**：底部显示充值与赠送余额合计；右键刷新，悬停查看币种与明细。DeepSeek 按金额显示，不换算成百分比；星号表示缓存，未连接显示 `--`。
+- **随客户端启动**：连接设置中勾选随 DeepSeek 启动桌宠。托盘点击唤醒或隐藏。
+- **保存与换电脑**：修改自动保存，可导出配置素材包或包含运行程序的便携完整包。GIF、气泡、字体、语音和全部桌宠设置一起携带。
 
-适用于 **Windows 10/11 x64**。完整包附带 三套表情，共 83 个 GIF，以及 40 个音频文件、对应台词和字体。表情绑定、播放节奏、气泡、语音及外观已预设，解压后即可运行，无需安装 Python。
+![语音触发频率](docs/demo/voice-frequency.png)
+![连接与启动设置](docs/demo/startup-setting.png)
 
-## 效果预览
+## 换电脑
 
-![Codex 模拟交互：思考、查阅、编辑与多项目完成提醒](docs/social/showcase.gif)
+桌宠右键 → **外观、声音与迁移 → 保存与迁移 → 导出 Windows 便携完整包**。
+在新电脑解压，安装并登录官方 Harness，启动桌宠，再在连接设置中安装连接插件。登录信息和聊天记录不在桌宠包内。
 
-[横屏视频：互动与完整设置演示](https://github.com/Doya16/shorekeeper-codex-pet/releases/download/v0.9.1/shorekeeper-landscape-v091.mp4) · [竖屏视频](https://github.com/Doya16/shorekeeper-codex-pet/releases/download/v0.9.1/shorekeeper-portrait-v091.mp4)
+也可以导入原 Codex 版的配置素材包，继续使用自己的 GIF、声音、字幕、字体和动画设置；DeepSeek 的连接路径单独设置。
 
-新版演示约 **1 分 50 秒**，包含模拟 Codex 对话、逐行编辑、多个项目分别完成的提醒，以及鼠标互动和完整设置。**Codex 窗口为模拟交互，项目、对话和额度均为示例**；桌宠、气泡和设置面板展示当前版本界面。
+## 当前预览版说明
 
-| 时间 | 展示内容 |
-| --- | --- |
-| 00:01 | 思考 → 查阅 → 编辑；回到思考时不重复开场语音 |
-| 00:19 | 第一个项目完成时提醒，随后恢复另一项目的编辑表情 |
-| 00:41 | 拖动、放下、双击和摸头，语音完整播放 |
-| 00:57 | 自选 GIF、播放节奏、多条语音与逐条字幕配对 |
-| 01:19 | 待机语音频率、实时调整大小、随 Codex 启动 |
-| 01:37 | 保存全部配置，导出便携完整包 |
+- 面向官方 Harness 桌面客户端；网页版普通 DeepSeek 聊天不在本版连接范围。
+- 安装插件后新开始的任务会出现在桌宠会话列表，列表用“DeepSeek 会话”编号显示。
+- “思考”表示任务处理阶段；气泡展示你设置的台词和字幕。
+- 尚未发布 DeepSeek 版 GitHub 下载页；原版项目见 [守岸人 Codex 桌宠](https://github.com/Doya16/shorekeeper-codex-pet)。
 
-![一个项目完成时，另一个项目继续编辑](docs/social/multi-project.jpg)
+## 素材来源与感谢
 
-## 下载与使用
+表情包来自 [鸣潮表情包站](https://emoji.wuwa.games/)。表情包众筹 QQ 群：**1079834905**。
+感谢所有为该项目表情包众筹投资的守岸人厨子们。
+字体、角色语音与其他素材说明见 [THIRD_PARTY.txt](THIRD_PARTY.txt)。
 
-1. 在 Windows 上安装并登录 **Codex**。
-2. 打开 [Releases](https://github.com/Doya16/shorekeeper-codex-pet/releases/latest)，下载 **Shorekeeper-Windows-v0.9.1.zip**。
-3. 完整解压，运行 **守岸人Codex桌宠启动.exe**，保留同目录的其他文件夹。
-4. 右键桌宠 → **自动跟随当前任务**；打开 **交互工作室**即可更换表情和语音。
+## 从源码运行
 
-声音默认开启，音量为 10%。在「外观、声音与迁移 → 声音」中调整或关闭。
-
-## 功能
-
-- **跟随任务**：思考、查阅、编辑、等待和完成时，切换到对应的表情。多个项目同时运行时，各会话的完成提醒依次播放，之后回到正在工作的任务。
-- **鼠标互动**：单击摸头、双击、拖动、放下、递奶茶，各自设置回应。
-- **自选素材**：每种交互单独选择 GIF 或图片；循环、速度、停留时间和下一状态均可调整。
-- **语音与台词**：同一动作加入多条语音，逐条配对气泡文案，再随机抽取一组播放。
-- **外观与配额**：实时缩放，调整字体和字号，桌宠下方显示算力配额。
-- **保存与迁移**：将 GIF、声音、气泡、字体和全部配置一起打包，带到另一台电脑。
-
-同一轮任务可以只播放一次思考开场语音。切换 GIF 后，当前语音会继续播放到结束。待机语音默认本次桌宠启动只播放一次；也可选择每次进入，或按概率和最短间隔偶尔播放。主动试听不占用自动播报次数。
-
-**随 Codex 启动**：右键 → 外观、声音与迁移 → 连接 Codex → 勾选「随 Codex 启动桌宠」。取消勾选可关闭联动。此选项默认关闭，随配置迁移，在新电脑首次手动启动桌宠后恢复。
-
-| 语音触发频率 | 随 Codex 启动 |
-| --- | --- |
-| ![每次进入、启动一次或偶尔播放](docs/demo/voice-frequency.png) | ![启动联动开关](docs/demo/startup-setting.png) |
-
-气泡宽度和配额条大小可以分别调整、预览，之后按保存的比例随桌宠一起缩放。长台词自动换行，不截断行数或文字。选择 **自定义音频+字幕** 后，只显示抽中语音对应的文案，播完收起；不会再接着显示该动作的通用台词。附带配置中，已有语音与字幕配对的动作均已启用此模式。
-
-## 自定义
-
-右键桌宠 → **交互工作室**，先选左侧动作，再修改右侧设置。
-
-| 想修改什么 | 设置入口 |
-| --- | --- |
-| 表情或图片 | GIF 素材 → 点击缩略图 |
-| 添加自己的素材 | 导入图片；或打开素材目录 → 放入文件 → 刷新素材 |
-| 循环、速度、播完停留、下一状态 | 播放与切换 |
-| 气泡台词、字体、字号 | 气泡与字体 |
-| 仅显示抽中语音的配对文案 | 气泡与字体 → 气泡内容 → 自定义音频+字幕 |
-| 气泡宽度、配额条大小与预览 | 右键 → 调整大小；也可拖动两侧小竖线 |
-| 多条语音与逐条配对文案 | 语音与配对气泡 → 添加多个文件 → 选中一条编辑 |
-| 待机只播一次、每次进入或偶尔播放 | 待机陪伴 → 语音与配对气泡 → 自动播报频率 |
-| 任务开始只播一次语音 | 思考状态 → 自动播报频率 → 同一轮任务只播一次 |
-
-| 自选表情 | 配对语音与气泡 |
-| --- | --- |
-| ![GIF 素材列表](docs/demo/gif-library-panel.png) | ![语音与配对文案](docs/demo/voice-pairs-panel.png) |
-
-支持 GIF、动画 WebP、PNG、JPG/JPEG、静态 WebP；语音支持 WAV、MP3、OGG、FLAC、M4A、AAC；字体支持 TTF、OTF、TTC。音频旁放置同名 UTF-8 TXT，可在导入时读取台词。不添加音频也能使用。
-
-![自定义音频与字幕模式](docs/demo/bubble-mode-panel.png)
-
-配对文案留空时，该条语音不显示气泡。使用默认内容或“使用我的台词”时，气泡只显示所选内容。已填写的其他台词会保留，切换模式后可以继续编辑。
-
-**调整大小**：右键 → 调整大小，或将鼠标放在桌宠上按 **Ctrl + 滚轮**。气泡宽度与配额条大小有各自的滑块和百分比输入；勾选 **显示气泡预览（无声音）**，没有台词时也能调整。气泡出现时可拖动左右边缘，配额条也可拖动两侧，文字会一起缩放。修改自动保存，之后整体缩放仍保留两者的相对比例。
-
-![气泡宽度与配额条大小实时预览](docs/social/size-preview.jpg)
-
-[查看完整调整面板](docs/demo/resize-controls.png)
-
-气泡宽度支持角色宽度的 75%–400%，配额条支持原大小的 50%–250%。屏幕放不下时临时适配，不覆盖保存的比例。详细格式限制和各项参数见 [使用指南](docs/USAGE.md)。
-
-## 保存与迁移
-
-![保存 GIF、声音、字幕、字体和全部配置](docs/social/portable-profile.jpg)
-
-修改会自动保存。手动保存或导出：**右键 → 外观、声音与迁移 → 保存与迁移**。
-
-| 导出方式 | 包含内容 |
-| --- | --- |
-| JSON 快照 | 配置文字和选项 |
-| 配置与素材 ZIP | GIF / 图片、音频、字体、气泡文案、全部配置及默认配置 |
-| Windows 便携完整包 | 配置与素材，以及可运行程序 |
-
-换电脑时，先安装并登录 Codex，再完整解压便携包并运行 **守岸人Codex桌宠启动.exe**。连接会重新自动检测，自定义内容保留，也可以继续导出。
-
-## 常见问题
-
-**表情没有跟随新任务？** 右键选择「自动跟随当前任务」。固定会话可在「外观、声音与迁移 → 连接 Codex」中修改。
-
-**额度后面有 `*` 或显示 `--`？** `*` 表示缓存记录，`--` 表示暂无数据。右键点击「刷新额度」；悬停可查看完整窗口与重置时间。
-
-**某些数值框是灰色的？** 当前模式不使用该设置，悬停查看提示。例如调整单次播放后的停留时间，需要选择适用的播放模式。
-
-**遇到其他问题？** 到 [Issues](https://github.com/Doya16/shorekeeper-codex-pet/issues) 附上系统版本、操作步骤和报错截图。
-
-## 素材来源与致谢
-
-表情包素材来自 **[呜哇小站 · 表情包仓鼠库](https://emoji.wuwa.games/)**。
-
-**表情包众筹 QQ 群：1079834905**
-
-感谢所有为本项目使用的守岸人表情包参与众筹、出资支持的守岸人厨子们。
-
-角色、图片与原版语音的权利归各自权利人所有。表情包仅供个人、非商业使用，请勿倒卖或用于付费分发。程序依赖及字体的许可不适用于角色素材；详见 [素材说明](assets/CREDITS.txt) 和 [第三方许可](THIRD_PARTY.txt)。
-
-<details>
-<summary>从源码运行</summary>
-
-安装 Python 3.12，在项目目录执行：
+安装 Python 3.11+，在项目目录执行：
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m shorekeeper_pet
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python tools\run_pet.py
 ```
 
-源码入口：根目录的 **守岸人Codex桌宠启动.vbs**，或上述命令。程序模块位于 `shorekeeper_pet/`；构建、验证和快捷方式工具位于 `tools/`。从其他目录启动时，可使用 `python 项目路径/tools/run_pet.py`。
-
-构建便携版：先运行 `.\.venv\Scripts\python.exe -m pip install -r tools/requirements-build.txt`，再运行 `.\.venv\Scripts\python.exe tools/build_portable.py`。输出在 `dist/守岸人Codex桌宠/`。
-
-运行检查：`.\.venv\Scripts\python.exe -m unittest discover -s tests`。
-
-</details>
+```powershell
+.venv\Scripts\python -m unittest discover -s tests
+node --test integrations/deepseek/state.test.js
+.venv\Scripts\python tools\build_portable.py
+```

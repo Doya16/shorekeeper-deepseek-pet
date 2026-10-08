@@ -1,281 +1,92 @@
-"""Read-only Codex companion bridge. Never requests model inference or reads auth.json."""
+"""Read Harness pet plugin metadata, never credentials or chat logs."""
 from __future__ import annotations
-import json, os, pathlib, queue, re, shutil, sqlite3, subprocess, threading, time
-from datetime import datetime
+import json, os, pathlib, time
+from decimal import Decimal, InvalidOperation
+from .paths import ROOT, DSH_HOME
 
-from .paths import ROOT,CODEX_HOME
+def discover_deepseek(explicit=''):
+    if explicit:
+        p=pathlib.Path(explicit); return str(p) if p.is_file() else None
+    for base in (os.environ.get('LOCALAPPDATA',''),os.environ.get('ProgramFiles','')):
+        for suffix in ('Programs/DeepSeek Harness/DeepSeek Harness.exe','DeepSeek Harness/DeepSeek Harness.exe'):
+            p=pathlib.Path(base)/suffix
+            if p.is_file(): return str(p)
+    return None
 
-def timestamp(value):
-    try:
-        return datetime.fromisoformat(value.replace('Z','+00:00')).timestamp()
-    except (ValueError, AttributeError):
-        return 0.0
+def read_snapshot(home):
+    path=pathlib.Path(home)/'shorekeeper-pet/desktop.json'
+    if path.stat().st_size>2_000_000: raise ValueError('状态文件过大')
+    value=json.loads(path.read_text('utf8'))
+    if value.get('schema')!=1 or value.get('backend')!='deepseek-harness': raise ValueError('状态格式不受支持')
+    return value
 
-def windows_from_limits(result):
-    buckets = result.get('rateLimitsByLimitId') or {}
-    if not buckets and result.get('rateLimits'):
-        item = result['rateLimits']
-        buckets = {item.get('limitId') or item.get('limit_id') or 'codex': item}
-    rows=[]
-    for key, bucket in buckets.items():
-        for kind in ('primary','secondary'):
-            w=bucket.get(kind)
-            if not w: continue
-            used=w.get('usedPercent', w.get('used_percent'))
-            if not isinstance(used,(int,float)): continue
-            minutes=w.get('windowDurationMins', w.get('window_minutes'))
-            duration = '每周' if minutes==10080 else (f'{minutes//60} 小时' if minutes and minutes%60==0 else f'{minutes} 分钟' if minutes else '额度窗口')
-            rows.append(dict(bucket=key,name=bucket.get('limitName') or bucket.get('limit_name') or key,kind=kind,label=duration,remaining=max(0,min(100,100-used)),resets_at=w.get('resetsAt',w.get('resets_at'))))
-    return rows
+def is_connected(value):
+    age=time.time()-value.get('updated_at',0)
+    return bool(value.get('connected')) and -5<=age<10
 
-def discover_codex(explicit=''):
-    if explicit: return str(pathlib.Path(explicit)) if pathlib.Path(explicit).is_file() else None
-    exe=shutil.which('codex')
-    if exe: return exe
-    base=pathlib.Path(os.environ.get('LOCALAPPDATA',''))/'OpenAI/Codex/bin'
-    candidates=list(base.glob('*/codex.exe'))
-    return str(max(candidates,key=lambda p:p.stat().st_mtime)) if candidates else None
+def balance_data(value):
+    b=value.get('balance',{}); connected=is_connected(value); rows=[]
+    for key in ('wallets','bonus'):
+        for row in b.get(key,[]) if isinstance(b.get(key,[]),list) else []:
+            try:
+                amount=Decimal(row['balance'])
+                if row.get('currency') not in ('CNY','USD') or not amount.is_finite() or abs(amount)>Decimal('1e12'): continue
+                rows.append(dict(currency=row['currency'],balance=str(amount),bonus=key=='bonus'))
+            except (KeyError,TypeError,InvalidOperation): continue
+    error='' if connected and b.get('status')=='ready' else (
+        '请登录 DeepSeek Harness' if b.get('status')=='signed-out' else
+        '请打开 DeepSeek Harness 并安装桌宠连接插件' if not connected else '余额暂不可用')
+    return dict(windows=[],wallets=rows,updated_at=b.get('updated_at',0),
+        source='live' if connected else 'cache',error=error,status=b.get('status','unavailable'))
 
-def tool_phase(payload):
-    """Classify operation identifiers locally; never display arguments or output."""
-    name=payload.get('name','').rsplit('.',1)[-1]
-    code=payload.get('input','') if name=='exec' else ''
-    if not isinstance(code,str): code=''
-    names=' '.join(re.findall(r'tools\.([A-Za-z0-9_]+)\s*\(',code))+' '+name
-    if 'request_user_input' in names: return 'waiting'
-    if re.search(r'apply_patch|write_file|edit_file',names): return 'writing'
-    if re.search(r'web__|search|read_|view_|list_|get_',names): return 'reading'
-    # Shell reads commonly run through exec_command rather than a read_file tool.
-    commands=[]
-    if name=='exec_command':
-        try: commands=[json.loads(payload.get('arguments','{}')).get('cmd','')]
-        except (ValueError,TypeError,AttributeError): pass
-    elif 'exec_command' in names:
-        commands=re.findall(r'''["']?cmd["']?\s*:\s*["']([^"'\r\n]*)''',code)
-    if commands and all(isinstance(cmd,str) and re.match(r'^\s*(?:rg|cat|head|tail|ls|Get-Content|Get-ChildItem|Select-String|Test-Path)\b',cmd,re.I) for cmd in commands): return 'reading'
-    return 'working'
+def balance_label(data,compact=False):
+    rows=data.get('wallets',[])
+    if not rows: return '算力余额：--' if compact else data.get('error') or '余额读取中…'
+    totals={currency:sum((Decimal(r['balance']) for r in rows if r['currency']==currency),Decimal(0)) for currency in ('CNY','USD')}
+    currency=next((c for c in ('CNY','USD') if totals[c]>0),rows[0]['currency'])
+    total=totals[currency]
+    amount=format(total.quantize(Decimal('.01')),'f')
+    stale=data.get('error') or data.get('source')!='live' or time.time()-data.get('updated_at',0)>300
+    return f"算力余额：{'¥' if currency=='CNY' else '$'}{amount}"+(' *' if stale else '')
 
 class RateClient:
-    """One authenticated app-server process; only initialize and read limits are sent."""
-    def __init__(self,executable='',codex_home=''):
-        self.executable=executable; self.codex_home=codex_home
-        self.process=None
-        self.inbox=queue.Queue()
-        self.lock=threading.Lock()
-        self.sequence=1
-
-    def _send(self, obj):
-        self.process.stdin.write(json.dumps(obj)+'\n')
-        self.process.stdin.flush()
-
-    def _response(self, ident, timeout=20):
-        end=time.monotonic()+timeout
-        while time.monotonic()<end:
-            try: obj=self.inbox.get(timeout=min(1,end-time.monotonic()))
-            except queue.Empty: continue
-            if obj.get('id')!=ident: continue
-            if 'error' in obj: raise RuntimeError('Codex 额度接口暂不可用')
-            return obj.get('result',{})
-        raise TimeoutError('Codex 额度查询超时')
-
-    def _start(self):
-        exe=discover_codex(self.executable)
-        if not exe: raise FileNotFoundError('没有找到 Codex 程序')
-        self.inbox=queue.Queue()
-        env=os.environ.copy()
-        if self.codex_home: env['CODEX_HOME']=self.codex_home
-        self.process=subprocess.Popen([exe,'app-server'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,text=True,encoding='utf-8',env=env,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
-        def reader(proc, inbox):
-            try:
-                for line in proc.stdout:
-                    try: inbox.put(json.loads(line))
-                    except json.JSONDecodeError: pass
-            except (OSError,ValueError): pass
-        threading.Thread(target=reader,args=(self.process,self.inbox),daemon=True).start()
-        self._send({'id':0,'method':'initialize','params':{'clientInfo':{'name':'shorekeeper_companion','title':'Shorekeeper companion','version':'0.1.0'}}})
-        self._response(0)
-        self._send({'method':'initialized','params':{}})
-
+    def __init__(self,executable='',deepseek_home=''):
+        self.executable=executable; self.deepseek_home=deepseek_home
     def read(self):
-        with self.lock:
-            try:
-                if not self.process or self.process.poll() is not None: self._start()
-                self.sequence+=1
-                self._send({'id':self.sequence,'method':'account/rateLimits/read'})
-                result=self._response(self.sequence)
-                return dict(windows=windows_from_limits(result),updated_at=time.time(),source='live',error=None)
-            except Exception:
-                self.close()
-                raise
-
-    def close(self):
-        if self.process:
-            try:
-                self.process.terminate()
-                self.process.wait(timeout=3)
-            except (OSError,subprocess.TimeoutExpired):
-                try: self.process.kill()
-                except OSError: pass
-            self.process=None
-
-class SessionReader:
-    def __init__(self, path):
-        self.path=pathlib.Path(path)
-        self.offset=0
-        self.pending=b''
-        self.state='idle'
-        self.public_note=''
-        self.last_event=0.0
-        self.started=0.0
-        self.turn_id=None
-        self.ended=0.0
-        self.active=False
-        self.rate=None
-        self.revision=0
-        self.events=[]; self.terminal_seen=set()
-        self.recent_tool_state=None; self.tool_visible_until=0
-        self.poll()
-
-    def terminal(self,state,when,turn_id=None):
-        turn_id=turn_id or self.turn_id
-        key=(state,turn_id or self.started or when)
-        if key in self.terminal_seen:return
-        if key not in self.terminal_seen:
-            self.terminal_seen.add(key)
-            self.events.append(dict(state=state,turn_id=turn_id,started=self.started,ended=when))
-        # A delayed completion for an older turn must not end a newer turn.
-        if turn_id and self.turn_id and turn_id!=self.turn_id: return
-        self.active=False; self.ended=when; self.state=state
-
-    def drain_events(self):
-        events=self.events; self.events=[]; return events
-
-    def accept(self, obj):
-        payload=obj.get('payload') or {}
-        category=obj.get('type')
-        kind=payload.get('type')
-        when=timestamp(obj.get('timestamp'))
-        if category=='event_msg':
-            if kind=='task_started':
-                turn_id=payload.get('turn_id')
-                if not turn_id or turn_id!=self.turn_id: self.started=when
-                self.turn_id=turn_id; self.active=True; self.ended=0
-                self.state='thinking'; self.public_note=''
-                self.recent_tool_state=None; self.tool_visible_until=0
-            elif kind in ('task_complete','task_completed','turn_aborted'):
-                self.terminal('done' if kind!='turn_aborted' else 'paused',when,payload.get('turn_id'))
-            elif kind=='token_count':
-                limits=payload.get('rate_limits')
-                if limits:
-                    self.rate=dict(windows=windows_from_limits({'rateLimits':limits}),updated_at=when,source='session',error=None)
-                return
-            elif kind in ('error','turn_failed'):
-                self.terminal('error',when,payload.get('turn_id'))
-            else: return
-        elif category=='response_item':
-            # Ignore reasoning items, user messages, tool arguments and outputs as text.
-            if kind=='message' and payload.get('role')=='assistant':
-                if payload.get('phase')=='commentary':
-                    text=' '.join(c.get('text','') for c in payload.get('content',[]) if c.get('type') in ('output_text','text'))
-                    self.public_note=re.sub(r'\s+',' ',text).strip()[:260]
-                elif payload.get('phase')=='final_answer':
-                    self.terminal('done',when)
-                else: return
-            elif kind in ('function_call','custom_tool_call'):
-                self.state=tool_phase(payload); self.recent_tool_state=self.state; self.tool_visible_until=0
-                self.active=True
-            elif kind in ('function_call_output','custom_tool_call_output'):
-                if self.active and self.state!='waiting':
-                    # A sub-second operation may start and finish between polls.
-                    # Briefly retain its animation, but never delay completion.
-                    if self.state in ('reading','writing'): self.tool_visible_until=when+1.5
-                    self.state='thinking'
-            else: return
-        else: return
-        self.last_event=max(self.last_event,when)
-        self.revision+=1
-
-    def display_state(self,now):
-        if self.active and self.state=='thinking' and now<self.tool_visible_until and self.recent_tool_state in ('reading','writing'): return self.recent_tool_state
-        return self.state
-
-    def poll(self):
+        home=pathlib.Path(self.deepseek_home or DSH_HOME)
         try:
-            size=self.path.stat().st_size
-            if size<self.offset:
-                self.offset=0; self.pending=b''; self.active=False; self.state='idle'; self.last_event=0
-            with self.path.open('rb') as file:
-                file.seek(self.offset)
-                if self.offset==0 and size>8_000_000:
-                    file.seek(size-8_000_000); file.readline()
-                chunk=file.read()
-                self.offset=file.tell()
-            lines=(self.pending+chunk).split(b'\n'); self.pending=lines.pop()
-            for line in lines:
-                if not line.strip(): continue
-                try: self.accept(json.loads(line))
-                except (ValueError,TypeError,AttributeError): continue
-        except OSError: pass
+            request=home/'shorekeeper-pet/refresh'; request.parent.mkdir(parents=True,exist_ok=True); request.touch()
+            return balance_data(read_snapshot(home))
+        except (OSError,ValueError,TypeError):
+            return dict(windows=[],wallets=[],error='请打开 DeepSeek Harness 并安装桌宠连接插件',source='unavailable')
+    def close(self): pass
 
 class Monitor:
-    def __init__(self, codex_home=CODEX_HOME):
-        self.home=pathlib.Path(codex_home)
-        self.readers={}
-        self.threads=[]
-        self.last_discovery=0
-        self.selected='auto'
-        self.error=None
-        self.observe_since=time.time()
-
-    def discover(self):
-        candidates=sorted(self.home.glob('state_*.sqlite'),key=lambda p:p.stat().st_mtime,reverse=True)
-        if not candidates: self.error='尚未找到 Codex 本地会话'; return
-        try:
-            with sqlite3.connect(candidates[0].as_uri()+'?mode=ro',uri=True,timeout=0.5) as db:
-                # Do not select message bodies, auth or account fields.
-                rows=db.execute("SELECT id,title,rollout_path,updated_at FROM threads WHERE archived=0 AND (agent_path IS NULL OR agent_path='/root') ORDER BY updated_at DESC LIMIT 64").fetchall()
-            latest=[dict(id=r[0],title=r[1],path=r[2],updated=r[3]) for r in rows if r[2] and pathlib.Path(r[2]).is_file()]
-            ids={r['id'] for r in latest}
-            self.threads=latest+[r for r in self.threads if r['id'] not in ids and r['id'] in self.readers and self.readers[r['id']].active]
-            self.error=None
-        except sqlite3.Error:
-            self.error='会话列表暂不可读，稍后重试'
-
+    def __init__(self,home=DSH_HOME):
+        self.home=pathlib.Path(home); self.selected='auto'; self.threads=[]
+        self.observe_since=time.time(); self.instance=None; self.sequence=0; self.error=''; self.last={}
+    def cached_rate(self): return balance_data(self.last) if self.last else None
     def poll(self):
-        now=time.time()
-        if now-self.last_discovery>5:
-            self.discover(); self.last_discovery=now
+        base=dict(state='idle',message='',title='',thread_id='',turn_id='',stale=False,active=False,events=[])
+        try:
+            value=read_snapshot(self.home); self.last=value
+            if not is_connected(value): raise ValueError('桌宠连接插件尚未连接')
+            self.error=''
+        except (OSError,ValueError,TypeError):
+            self.error='请打开 DeepSeek Harness 并安装桌宠连接插件'; self.threads=[]
+            return dict(base,state='unknown',stale=True)
+        if self.instance!=value.get('instance'):
+            self.instance=value.get('instance'); self.sequence=0
         events=[]
-        for row in self.threads:
-            if row['id'] not in self.readers: self.readers[row['id']]=SessionReader(row['path'])
-            else: self.readers[row['id']].poll()
-            for event in self.readers[row['id']].drain_events():
-                if event['ended']>=self.observe_since:
-                    events.append(dict(event,thread_id=row['id'],title=row['title']))
-        events.sort(key=lambda event:event['ended'])
-        # Keep bounded history, but retain an explicitly pinned conversation.
-        keep={row['id'] for row in self.threads}|{self.selected}
-        self.readers={key:r for key,r in self.readers.items() if key in keep}
-        chosen=next((r for r in self.threads if r['id']==self.selected),None)
-        if chosen is None and self.selected=='auto' and self.threads:
-            active=[r for r in self.threads if self.readers[r['id']].active and now-self.readers[r['id']].last_event<600]
-            chosen=max(active or self.threads,key=lambda r:self.readers[r['id']].last_event)
-        if not chosen:
-            return dict(state='idle',message=self.error or '我在这里，等你开始下一件事。',title='',thread_id=None,stale=False,revision=0,events=events)
-        reader=self.readers[chosen['id']]
-        age=now-reader.last_event
-        stale=reader.active and age>180
-        state='unknown' if stale else reader.display_state(now)
-        return dict(state=state,message=reader.public_note,title=chosen['title'],thread_id=chosen['id'],turn_id=reader.turn_id,stale=stale,revision=reader.revision,last_event=reader.last_event,active=reader.active,age=age,started=reader.started,ended=reader.ended,events=events)
-
-    def cached_rate(self):
-        rates=[r.rate for r in self.readers.values() if r.rate]
-        return max(rates,key=lambda r:r['updated_at']) if rates else None
-
-if __name__=='__main__':
-    monitor=Monitor()
-    status=monitor.poll()
-    print(json.dumps({k:v for k,v in status.items() if k not in ('message','title')},ensure_ascii=False))
-    client=RateClient()
-    try: print(json.dumps(client.read(),ensure_ascii=False))
-    finally: client.close()
+        for event in value.get('events',[]):
+            seq=event.get('seq',0)
+            if seq>self.sequence and event.get('ended',0)>=self.observe_since: events.append(event.copy())
+            self.sequence=max(self.sequence,seq)
+        rows=value.get('sessions',[])
+        self.threads=[dict(id=r['thread_id'],title=r['title']) for r in rows]
+        choices=[r for r in rows if self.selected=='auto' or r['thread_id']==self.selected]
+        if not choices: return dict(base,events=events)
+        row=max(choices,key=lambda r:(bool(r.get('active')),r.get('last_event',0)))
+        result=dict(base,**{k:v for k,v in row.items() if k in ('state','message','title','thread_id','turn_id','active','started','ended','last_event','revision')})
+        if not result['active'] and result['state'] in ('done','error','paused'): result['state']='idle'
+        result['events']=events; return result

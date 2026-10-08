@@ -1,0 +1,50 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {PetState, safeBalance} from './state.js';
+const session = {id: 'a', header: {}};
+test('parallel sessions complete separately, tasks retain turn identity', () => {
+  const s = new PetState(() => 10);
+  const emit = (type, data = {}, sub = session) => s.accept(sub, {type, data});
+  emit('turn/start', {turn: 1}); emit('turn/start', {turn: 1}, {id: 'b'});
+  emit('tool/call', {callId: 'r', name: 'read_file', arguments: 'SECRET'});
+  assert.equal(s.snapshot().sessions[0].state, 'reading');
+  emit('tool/result', {callId: 'r'});
+  emit('tool/call', {callId: 'e', name: 'edit_file'});
+  assert.equal(s.snapshot().sessions[0].state, 'writing');
+  assert.equal(s.snapshot().sessions[0].turn_id, '1');
+  emit('turn/end', {turn: 1, reason: {kind: 'completed'}});
+  emit('turn/end', {turn: 1, reason: {kind: 'completed'}});
+  assert.equal(s.events.length, 1); assert.equal(s.snapshot().sessions[1].active, true);
+  assert.ok(!JSON.stringify(s.snapshot()).includes('SECRET'));
+});
+test('approval, errors, cancel, subagents, repair, tool holds', () => {
+  let now = 10; const s = new PetState(() => now);
+  const e = (type, data = {}) => s.accept(session, {type, data});
+  e('turn/start', {turn: 1}); e('tool/call', {name: 'read_file', callId: 'a'});
+  e('approval/asked'); assert.equal(s.snapshot().sessions[0].state, 'waiting');
+  e('approval/decided'); e('tool/result', {callId: 'a'});
+  assert.equal(s.snapshot().sessions[0].state, 'reading'); now += 2;
+  assert.equal(s.snapshot().sessions[0].state, 'thinking');
+  e('turn/end', {reason: {kind: 'error'}}); assert.equal(s.events[0].state, 'error');
+  e('turn/start', {turn: 2}); e('turn/end', {reason: {kind: 'aborted'}});
+  assert.equal(s.events[1].state, 'paused');
+  s.accept({id: 'sub', header: {origin: 'subagent'}}, {type: 'turn/start', data: {turn: 1}});
+  assert.equal(s.sessions.size, 1);
+  e('turn/start', {turn: 3}); e('turn/end', {reason: {kind: 'interrupted'}});
+  assert.equal(s.events.length, 2);
+});
+test('balance projection cannot export credential fields or fake percentages', () => {
+  const b = safeBalance({status:'ready', value:[{currency:'CNY',balance:'12.34',token:'SECRET'}], bonusWallets:[]});
+  assert.deepEqual(b, {status:'ready', wallets:[{currency:'CNY',balance:'12.34'}], bonus:[]});
+  assert.equal(safeBalance(null).status, 'signed-out');
+  assert.equal(safeBalance({status:'failed'}).status, 'unavailable');
+  assert.equal(safeBalance({status:'ready', value:[{currency:'CNY',balance:'0E-16'}]}).wallets.length, 1);
+});
+test('ordinary forked conversations are observed, old turn endings are ignored', () => {
+  const s=new PetState(() => 10), fork={id:'fork',header:{parentSession:'parent'}};
+  s.accept(fork,{type:'turn/start',data:{turn:2}});
+  s.accept(fork,{type:'turn/end',data:{turn:1,reason:{kind:'completed'}}});
+  assert.equal(s.snapshot().sessions[0].active,true); assert.equal(s.events.length,0);
+  s.accept(fork,{type:'turn/end',data:{turn:2,reason:{kind:'completed'}}});
+  assert.equal(s.events.length,1);
+});

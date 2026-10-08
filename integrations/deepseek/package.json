@@ -1,0 +1,8 @@
+{
+  "name": "dsh-shorekeeper-pet",
+  "version": "0.1.1",
+  "type": "module",
+  "main": "index.js",
+  "files": ["index.js", "state.js", "cordis.patch.yml"],
+  "dsh": {"bundle": {"patch": "./cordis.patch.yml"}}
+}

@@ -26,8 +26,8 @@ settings['position']=[80,360]; settings['quiet']=False
 save_atomic(module.SETTINGS,settings,backup=False)
 app=QApplication([]); app.setQuitOnLastWindowClosed(False)
 pet=module.Pet(offline=True); pet.voice.gate.path=sandbox/'voice-history.json'; pet.show(); pet.hover_timer.stop()
-pet.monitor.home=pathlib.Path('Codex')
-pet.quota_data=dict(windows=[dict(remaining=98,label='每周',name='Codex',resets_at=None)],source='live',updated_at=time.time())
+pet.monitor.home=pathlib.Path('DeepSeek')
+pet.quota_data=dict(windows=[dict(remaining=98,label='每周',name='DeepSeek',resets_at=None)],source='live',updated_at=time.time())
 pet.update_layout(); pet.open_bindings(); editor=pet.binding_editor; editor.resize(1080,920); editor.hide()
 pet.open_preferences(); prefs=pet.preferences; prefs.resize(790,780); prefs.hide()
 pet.open_size(); size=pet.size_dialog; size.hide()
@@ -68,10 +68,10 @@ def mouse(kind,local,global_pos,button,buttons):
     app.sendEvent(pet,QMouseEvent(kind,QPointF(local),QPointF(global_pos),button,buttons,Qt.KeyboardModifier.NoModifier))
 
 scenes=[
- (0,'cover','守岸人 Codex 桌宠','把喜欢的表情、台词和声音，留在桌面上。'),
- (5,'thinking','跟随 Codex · 思考','任务开始时，播放思考表情与一条开场语音。'),
- (11,'reading','跟随 Codex · 查阅','开始查阅资料时，切换到绑定的查阅 GIF。'),
- (16,'writing','跟随 Codex · 编辑','开始编辑内容时，切换到绑定的编辑 GIF。'),
+ (0,'cover','守岸人 DeepSeek 桌宠','把喜欢的表情、台词和声音，留在桌面上。'),
+ (5,'thinking','跟随 DeepSeek · 思考','任务开始时，播放思考表情与一条开场语音。'),
+ (11,'reading','跟随 DeepSeek · 查阅','开始查阅资料时，切换到绑定的查阅 GIF。'),
+ (16,'writing','跟随 DeepSeek · 编辑','开始编辑内容时，切换到绑定的编辑 GIF。'),
  (21,'thinking-again','同一任务 · 开场语音只播一次','回到思考状态，继续播放 GIF，不重复开场语音。'),
  (24,'done','任务完成 · 语音与气泡','完成时显示对应表情、语音和配对文案。'),
  (28,'drag','按住拖动 · 换个位置','拖动时播放专属动作，也可以配上自己的声音。'),
@@ -84,7 +84,7 @@ scenes=[
  (66,'voice','多条语音 · 各自配一句台词','选择一条语音，填写它自己的气泡文案；可以逐条试听。'),
  (76,'size','大小与字体 · 实时调整','右键 → 调整大小；也可以按住 Ctrl 滚轮缩放。'),
  (85,'transfer','保存配置 · 带到新电脑','外观、声音与迁移 → 保存与迁移 → 导出 Windows 便携完整包。'),
- (94,'outro','开始你的桌面陪伴','下载完整包，解压后运行 守岸人Codex桌宠启动.exe。'),
+ (94,'outro','开始你的桌面陪伴','下载完整包，解压后运行 守岸人DeepSeek桌宠启动.exe。'),
 ]
 def enter_scene(name,new_title,new_instruction):
     global current_scene,title,instruction,visible_panel,cursor
@@ -159,7 +159,7 @@ def render():
             p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor('#74a2d5')); p.drawEllipse(QPointF(837,394+i*72),5,5)
             text(p,860,370+i*72,570,58,row,26)
     p.setPen(QPen(QColor('#cedeed'),2)); p.drawLine(55,907,1540,907)
-    text(p,55,927,1320,35,'守岸人 Codex 桌宠  ·  Windows  ·  GIF / 语音 / 气泡 / 字体 / 便携配置',21,'#507398')
+    text(p,55,927,1320,35,'守岸人 DeepSeek 桌宠  ·  Windows  ·  GIF / 语音 / 气泡 / 字体 / 便携配置',21,'#507398')
     text(p,1450,927,100,35,f'{frame_index/FPS:02.0f} / {SECONDS}',18,'#7590ab')
     p.end(); return image
 

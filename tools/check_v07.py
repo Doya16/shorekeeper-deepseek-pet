@@ -16,7 +16,7 @@ with tempfile.TemporaryDirectory() as directory:
     from shorekeeper_pet.presets import load_defaults
     data=json.loads(original) if original else load_defaults(root); data['appearance']['audio_enabled']=False; save_atomic(module.SETTINGS,data)
     pet=module.Pet(offline=True); pet.voice.gate.path=temp/'voice-history.json'; pet.show(); pet.hover_timer.stop()
-    pet.quota_data=dict(windows=[dict(remaining=98,label='每周',name='codex',resets_at=time.time()+1000)],updated_at=time.time(),source='live')
+    pet.quota_data=dict(windows=[dict(remaining=98,label='每周',name='deepseek',resets_at=time.time()+1000)],updated_at=time.time(),source='live')
     assert pet.quota_label(True)=='算力配额：98%'
     pet.open_size(); control=pet.size_dialog.control
     for percent in (50,75,100,145,200):

@@ -114,7 +114,9 @@ class PetRenderer:
         p.setPen(QPen(QColor(border),1.6)); p.setBrush(QColor('#fff4de' if low else '#edf5ff')); p.drawRoundedRect(bar,11,11)
         track=QRectF(bar.left()+11,bar.bottom()-9,bar.width()-22,4)
         p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor('#c1d3e7')); p.drawRoundedRect(track,2,2)
-        if windows:
+        if self.quota_data.get('wallets'):
+            # A line indicates connected balance; it is not a percent gauge.
+            remaining=100
             p.setBrush(QColor(fill)); p.drawRoundedRect(QRectF(track.left(),track.top(),track.width()*max(0,min(100,remaining))/100,track.height()),2,2)
         p.setFont(self.quota_font); p.setPen(QColor('#744d13' if low else '#204e7d'))
         label=QFontMetrics(self.quota_font).elidedText(self.quota_label(compact=True),Qt.TextElideMode.ElideRight,round(bar.width()-18))

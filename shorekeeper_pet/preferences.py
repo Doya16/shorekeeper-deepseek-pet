@@ -4,7 +4,7 @@ from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import QDialog,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QTabWidget,QScrollArea,QComboBox,QSpinBox,QCheckBox,QPushButton,QLineEdit,QFileDialog,QMessageBox
 from .appearance import stylesheet,load_fonts
 from .config_io import export_bundle,import_bundle,save_atomic
-from .paths import ROOT,CODEX_HOME
+from .paths import ROOT,DSH_HOME
 from .sizing import SizeControl
 from .presentation_size import PresentationControl
 
@@ -44,16 +44,18 @@ class Preferences(QDialog):
         self.add_button(transfer,'导出配置与素材包（ZIP）',lambda:self.export(False))
         self.add_button(transfer,'导出 Windows 便携完整包（ZIP）',lambda:self.export(True))
         self.add_button(transfer,'导入配置与素材包…',self.import_file)
-        tip=QLabel('迁移包会重置当前会话和本机连接路径，新电脑自动寻找当地已登录的 Codex。不会包含账户凭据、聊天记录或额度缓存。'); tip.setWordWrap(True); transfer.addRow(tip)
-        connect=self.tab('连接 Codex')
-        launch=QCheckBox('随 Codex 启动桌宠'); launch.toggled.connect(lambda value:self.change('launch_with_codex',value)); self.controls['launch_with_codex']=launch; connect.addRow(launch)
-        note=QLabel('勾选后，登录 Windows 时会在后台等待 Codex 打开，再启动桌宠。取消勾选会移除本机的启动联动。该选项随配置迁移，在新电脑首次手动启动桌宠后恢复。'); note.setWordWrap(True); connect.addRow(note)
+        tip=QLabel('迁移包会重置当前会话和本机连接路径，新电脑自动寻找已登录的 DeepSeek Harness（需安装连接插件）。不会包含账户凭据、聊天记录或额度缓存。'); tip.setWordWrap(True); transfer.addRow(tip)
+        connect=self.tab('连接 DeepSeek')
+        self.add_button(connect,'安装 / 更新 Harness 连接插件',self.install_bridge)
+        note=QLabel('首次使用：登录官方 DeepSeek Harness，然后从托盘完全退出，点击上方安装按钮，再重新打开客户端。换电脑或更新连接插件时同样操作。'); note.setWordWrap(True); connect.addRow(note)
+        launch=QCheckBox('随 DeepSeek 启动桌宠'); launch.toggled.connect(lambda value:self.change('launch_with_deepseek',value)); self.controls['launch_with_deepseek']=launch; connect.addRow(launch)
+        note=QLabel('勾选后，登录 Windows 时会在后台等待 DeepSeek 打开，再启动桌宠。取消勾选会移除本机的启动联动。该选项随配置迁移，在新电脑首次手动启动桌宠后恢复。'); note.setWordWrap(True); connect.addRow(note)
         self.sessions=QComboBox(); self.sessions.currentIndexChanged.connect(self.select_thread); connect.addRow('跟随的会话',self.sessions)
         note=QLabel('推荐自动跟随最近活动。固定到已结束的旧会话后，其他会话的思考、查阅和编辑动画不会触发。'); note.setWordWrap(True); connect.addRow(note)
-        row,self.codex_home=self.path_control('codex_home','选择 Codex 数据目录',True); connect.addRow('数据目录',row)
-        row,self.codex_exe=self.path_control('codex_executable','选择 codex.exe',False); connect.addRow('Codex 程序',row)
-        note=QLabel('留空即可自动检测：数据目录使用 CODEX_HOME 或当前用户的 .codex；程序从 PATH 和桌面版安装位置查找。新电脑请先安装并登录 Codex。'); note.setWordWrap(True); connect.addRow(note)
-        reconnect=QPushButton('应用连接并刷新额度'); reconnect.clicked.connect(pet.refresh_quota); connect.addRow(reconnect)
+        row,self.deepseek_home=self.path_control('deepseek_home','选择 DeepSeek 数据目录',True); connect.addRow('数据目录',row)
+        row,self.deepseek_exe=self.path_control('deepseek_executable','选择 DeepSeek Harness.exe',False); connect.addRow('DeepSeek 程序',row)
+        note=QLabel('留空即可自动检测：数据目录使用 DSH_HOME 或当前用户的 .dsh；程序从官方默认安装位置查找。新电脑请先安装并登录 DeepSeek。'); note.setWordWrap(True); connect.addRow(note)
+        reconnect=QPushButton('应用连接并刷新余额'); reconnect.clicked.connect(pet.refresh_quota); connect.addRow(reconnect)
         self.connection_status=QLabel(); self.connection_status.setWordWrap(True); connect.addRow(self.connection_status)
         self.status=QLabel('设置自动保存'); self.status.setWordWrap(True); layout.addWidget(self.status)
         close=QPushButton('完成'); close.clicked.connect(self.hide); layout.addWidget(close)
@@ -61,6 +63,15 @@ class Preferences(QDialog):
         self.refresh_controls(); self.loading=False; self.apply_style()
     def tab(self,title):
         scroll=QScrollArea(); scroll.setWidgetResizable(True); body=QWidget(); body.setObjectName('settingsBody'); form=QFormLayout(body); form.setContentsMargins(16,18,16,18); form.setSpacing(16); form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows); form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow); scroll.setWidget(body); self.tabs.addTab(scroll,title); return form
+    def install_bridge(self):
+        from .integration_setup import install
+        self.status.setText('正在安装连接插件…')
+        for button in self.buttons: button.setEnabled(False)
+        options=dict(self.pet.options)
+        def run():
+            try:self.jobs.finished.emit(install(options))
+            except Exception as error:self.jobs.failed.emit(str(error))
+        threading.Thread(target=run,daemon=True).start()
     def combo(self,key,names):
         control=QComboBox()
         for name in names: control.addItem(name,name)
@@ -68,7 +79,7 @@ class Preferences(QDialog):
     def spin(self,key,low,high,suffix):
         control=QSpinBox(); control.setRange(low,high); control.setSuffix(suffix); control.setKeyboardTracking(False); control.valueChanged.connect(lambda value:self.change(key,value)); self.controls[key]=control; return control
     def path_control(self,key,title,directory):
-        row=QHBoxLayout(); control=QLineEdit(); control.setPlaceholderText('留空自动检测' if key.startswith('codex') else 'audio'); self.controls[key]=control; control.editingFinished.connect(lambda:self.change(key,control.text().strip())); row.addWidget(control,1)
+        row=QHBoxLayout(); control=QLineEdit(); control.setPlaceholderText('留空自动检测' if key.startswith('deepseek') else 'audio'); self.controls[key]=control; control.editingFinished.connect(lambda:self.change(key,control.text().strip())); row.addWidget(control,1)
         button=QPushButton('浏览…')
         def choose():
             value=QFileDialog.getExistingDirectory(self,title,control.text()) if directory else QFileDialog.getOpenFileName(self,title,control.text(),'程序 (*.exe)')[0]

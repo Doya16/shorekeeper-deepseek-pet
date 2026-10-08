@@ -374,7 +374,7 @@
           "enabled": true
         }
       ],
-      "bubble_text": "（codex等待回应）",
+      "bubble_text": "（DeepSeek 等待回应）",
       "bubble_seconds": 5.0
     },
     "done": {
@@ -484,9 +484,9 @@
     "audio_enabled": true,
     "audio_cooldown": 8,
     "audio_directory": "defaults/audio",
-    "codex_home": "",
-    "codex_executable": "",
-    "launch_with_codex": false
+    "deepseek_home": "",
+    "deepseek_executable": "",
+    "launch_with_deepseek": false
   },
   "pack": "163",
   "thread": "auto",

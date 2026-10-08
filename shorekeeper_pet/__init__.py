@@ -1,1 +1,1 @@
-"""Shorekeeper Codex desktop companion."""
+"""Shorekeeper DeepSeek desktop companion."""

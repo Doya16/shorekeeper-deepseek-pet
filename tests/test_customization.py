@@ -42,13 +42,19 @@ class TimelineTests(unittest.TestCase):
         self.assertEqual(restored.resolve('a','pet')['audio_file'],'')
 
 class TransferTests(unittest.TestCase):
+    def test_codex_media_import_does_not_enable_codex_startup_or_copy_its_paths(self):
+        cfg=migrate_settings({'appearance':{'codex_home':'private','codex_executable':'private.exe','launch_with_codex':True,'volume':32},'bindings':{'pet':{'bubble_mode':'custom','bubble_text':'你好'}}})
+        self.assertNotIn('codex_home',cfg['appearance'])
+        self.assertNotIn('launch_with_codex',cfg['appearance'])
+        self.assertEqual(cfg['appearance']['volume'],32)
+        self.assertEqual(cfg['bindings']['pet']['bubble_text'],'你好')
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(); self.root=pathlib.Path(self.tmp.name)/'origin'; self.root.mkdir()
         for directory in ('assets/originals','fonts','audio'): (self.root/directory).mkdir(parents=True)
         (self.root/'assets/originals/a.gif').write_bytes(b'GIF89a')
         (self.root/'fonts/font.ttf').write_bytes(b'font')
         (self.root/'audio/notice.wav').write_bytes(b'RIFF test data')
-        self.settings={'thread':'private-local-id','appearance':{'audio_directory':str(self.root/'audio'),'codex_home':'local-account-path'},'bindings':{'pet':{'audio_file':'notice.wav','speed':.5}}}
+        self.settings={'thread':'private-local-id','appearance':{'audio_directory':str(self.root/'audio'),'deepseek_home':'local-account-path'},'bindings':{'pet':{'audio_file':'notice.wav','speed':.5}}}
     def tearDown(self): self.tmp.cleanup()
     def test_roundtrip_embeds_audio_and_fonts(self):
         dest=self.root.parent/'profile.zip'; export_bundle(dest,self.settings,self.root)
@@ -64,7 +70,7 @@ class TransferTests(unittest.TestCase):
         with zipfile.ZipFile(dest) as z:
             names=z.namelist(); cfg=json.loads(z.read('settings.json'))
             self.assertNotIn('auth.json',names); self.assertNotIn('runtime.json',names); self.assertIn(EXECUTABLE_NAME,names)
-            self.assertEqual(cfg['thread'],'auto'); self.assertEqual(cfg['appearance']['codex_home'],'')
+            self.assertEqual(cfg['thread'],'auto'); self.assertEqual(cfg['appearance']['deepseek_home'],'')
     def test_path_traversal_is_rejected_before_writes(self):
         dest=self.root.parent/'bad.zip'
         with zipfile.ZipFile(dest,'w') as z: z.writestr('../escape','bad')

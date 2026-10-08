@@ -7,47 +7,6 @@ from shorekeeper_pet.audio_player import VoicePlayer
 from shorekeeper_pet.config_io import save_atomic,export_bundle,import_bundle
 from shorekeeper_pet.presets import load_defaults
 
-class ConcurrentMonitorTests(unittest.TestCase):
-    def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory();self.root=pathlib.Path(self.tmp.name)
-        self.monitor=Monitor(self.root);self.monitor.observe_since=100;self.monitor.discover=lambda:None
-    def tearDown(self):self.tmp.cleanup()
-    def event(self,thread,kind,turn,when,category='event_msg',**extra):
-        from datetime import datetime,timezone
-        path=self.root/(thread+'.jsonl')
-        with path.open('a',encoding='utf8') as f:f.write(json.dumps(dict(timestamp=datetime.fromtimestamp(when,timezone.utc).isoformat(),type=category,payload=dict(type=kind,turn_id=turn,**extra)))+'\n')
-        if not any(r['id']==thread for r in self.monitor.threads):self.monitor.threads.append(dict(id=thread,title=thread,path=str(path)))
-    def poll(self):
-        with patch('shorekeeper_pet.bridge.time.time',return_value=110):return self.monitor.poll()
-    def test_other_project_completes_while_active_project_keeps_running(self):
-        self.event('a','task_started','one',101);self.event('b','task_started','two',102)
-        self.assertEqual(self.poll()['thread_id'],'b')
-        self.event('a','task_complete','one',103)
-        status=self.poll();self.assertEqual(status['thread_id'],'b');self.assertTrue(status['active'])
-        self.assertEqual([(x['thread_id'],x['turn_id']) for x in status['events']],[('a','one')])
-        self.assertEqual(self.poll()['events'],[])
-    def test_final_and_complete_deduplicate_and_two_completions_survive(self):
-        for name in ('a','b'):self.event(name,'task_started',name,101)
-        self.poll()
-        self.event('a','message','a',102,'response_item',role='assistant',phase='final_answer')
-        self.event('a','task_complete','a',103);self.event('b','task_complete','b',104)
-        self.assertEqual([e['thread_id'] for e in self.poll()['events']],['a','b'])
-    def test_fast_new_task_and_completion_between_polls_is_seen_without_old_history(self):
-        self.event('old','task_started','old',90);self.event('old','task_complete','old',91)
-        self.poll();self.event('new','task_started','new',102);self.event('new','task_complete','new',103)
-        self.assertEqual([e['thread_id'] for e in self.poll()['events']],['new'])
-    def test_completed_turn_is_retained_when_next_turn_has_already_started(self):
-        self.event('a','task_started','first',101);self.poll()
-        self.event('a','task_complete','first',102);self.event('a','task_started','second',103)
-        status=self.poll();self.assertTrue(status['active']);self.assertEqual(status['turn_id'],'second')
-        self.assertEqual(status['events'][0]['turn_id'],'first')
-        self.event('a','task_complete','first',104)
-        self.assertTrue(self.poll()['active']);self.assertEqual(self.poll()['events'],[])
-    def test_fixed_conversation_still_receives_other_project_completions(self):
-        self.event('a','task_started','one',101);self.event('b','task_started','two',102)
-        self.monitor.selected='b';self.poll();self.event('a','task_complete','one',103)
-        status=self.poll();self.assertEqual(status['thread_id'],'b');self.assertEqual(status['events'][0]['thread_id'],'a')
-
 class NotificationWidgetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):cls.app=QApplication.instance() or QApplication([]);cls.app.setQuitOnLastWindowClosed(False)
@@ -88,10 +47,10 @@ class NotificationWidgetTests(unittest.TestCase):
         self.assertFalse(editor.controls['audio_chance'].isEnabled())
         combo.setCurrentIndex(combo.findData('occasional'));self.assertTrue(editor.controls['audio_chance'].isEnabled())
         editor.controls['audio_chance'].setValue(35);editor.controls['audio_min_interval'].setValue(600)
-        p.open_preferences();p.preferences.controls['launch_with_codex'].setChecked(True)
-        saved=json.loads(module.SETTINGS.read_text('utf8'));self.assertTrue(saved['appearance']['launch_with_codex'])
+        p.open_preferences();p.preferences.controls['launch_with_deepseek'].setChecked(True)
+        saved=json.loads(module.SETTINGS.read_text('utf8'));self.assertTrue(saved['appearance']['launch_with_deepseek'])
         self.assertEqual(saved['bindings']['idle']['audio_chance'],35)
-        self.assertEqual(p.tray.toolTip(),'守岸人 · 点击唤醒/隐藏')
+        self.assertEqual(p.tray.toolTip(),'守岸人 · DeepSeek · 点击唤醒/隐藏')
 
 class VoiceFrequencyTests(unittest.TestCase):
     @classmethod
@@ -131,12 +90,12 @@ class VoiceFrequencyTests(unittest.TestCase):
             self.assertTrue(self.voice.trigger('done',binding,self.options,task=task,notification=True,now=10));self.voice.stop()
             self.assertFalse(self.voice.trigger('done',binding,self.options,task=task,notification=True,now=10))
     def test_options_and_media_survive_two_exports(self):
-        cfg={'schema_version':7,'bindings':{'idle':dict(self.binding,audio_policy='occasional',audio_chance=35,audio_min_interval=600)},'appearance':{'audio_directory':'audio','launch_with_codex':True}}
+        cfg={'schema_version':7,'bindings':{'idle':dict(self.binding,audio_policy='occasional',audio_chance=35,audio_min_interval=600)},'appearance':{'audio_directory':'audio','launch_with_deepseek':True}}
         root=self.root
         for n in range(2):
             archive=self.root/f'profile{n}.zip';self.assertFalse(export_bundle(archive,cfg,root))
             root=self.root/f'restored{n}';cfg=import_bundle(archive,root)
-            self.assertTrue(cfg['appearance']['launch_with_codex']);self.assertEqual(cfg['bindings']['idle']['audio_policy'],'occasional')
+            self.assertTrue(cfg['appearance']['launch_with_deepseek']);self.assertEqual(cfg['bindings']['idle']['audio_policy'],'occasional')
             self.assertEqual(cfg['bindings']['idle']['audio_min_interval'],600)
 
 if __name__=='__main__':unittest.main()
