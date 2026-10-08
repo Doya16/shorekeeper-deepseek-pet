@@ -6,6 +6,7 @@ from .appearance import stylesheet,load_fonts
 from .config_io import export_bundle,import_bundle,save_atomic
 from .paths import ROOT,DSH_HOME
 from .sizing import SizeControl
+from .paths import VERSION,AUDIO_SESSION_NAME
 from .presentation_size import PresentationControl
 
 class Jobs(QObject):
@@ -57,6 +58,13 @@ class Preferences(QDialog):
         note=QLabel('留空即可自动检测：数据目录使用 DSH_HOME 或当前用户的 .dsh；程序从官方默认安装位置查找。新电脑请先安装并登录 DeepSeek。'); note.setWordWrap(True); connect.addRow(note)
         reconnect=QPushButton('应用连接并刷新余额'); reconnect.clicked.connect(pet.refresh_quota); connect.addRow(reconnect)
         self.connection_status=QLabel(); self.connection_status.setWordWrap(True); connect.addRow(self.connection_status)
+        updates=self.tab('版本与更新')
+        updates.addRow(QLabel(AUDIO_SESSION_NAME+'  ·  当前版本 v'+VERSION))
+        automatic=QCheckBox('每次启动时检查 GitHub 更新'); automatic.toggled.connect(lambda value:self.change('check_updates_on_start',value)); self.controls['check_updates_on_start']=automatic; updates.addRow(automatic)
+        check=QPushButton('立即检查更新'); check.clicked.connect(lambda:pet.updates.check(True)); check.setEnabled(not pet.updates.busy); pet.updates.busy_changed.connect(lambda busy:check.setEnabled(not busy)); updates.addRow(check)
+        self.update_status=QLabel(pet.updates.status); self.update_status.setWordWrap(True); pet.updates.status_changed.connect(self.update_status.setText); updates.addRow(self.update_status)
+        restore=QPushButton('恢复已忽略版本的提醒'); restore.clicked.connect(lambda:self.change('ignored_update_version','')); updates.addRow(restore)
+        tip=QLabel('有新版时显示提示，检查失败不会打断使用。更新页面中请选择适用于当前版本的程序补丁；使用完整包时，请解压到新目录，再导入自己的配置与素材。'); tip.setWordWrap(True); updates.addRow(tip)
         self.status=QLabel('设置自动保存'); self.status.setWordWrap(True); layout.addWidget(self.status)
         close=QPushButton('完成'); close.clicked.connect(self.hide); layout.addWidget(close)
         self.jobs=Jobs(); self.jobs.finished.connect(self.job_finished); self.jobs.failed.connect(self.job_failed)

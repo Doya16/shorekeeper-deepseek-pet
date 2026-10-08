@@ -21,3 +21,5 @@ connection-check.json
 *.lnk
 /audio/
 /assets/custom/*
+
+update-check.json

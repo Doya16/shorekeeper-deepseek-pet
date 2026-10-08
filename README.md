@@ -21,7 +21,7 @@
 ## 开始使用
 
 1. 从 [DeepSeek 官网](https://www.deepseek.com/harness/) 下载 Windows 客户端，启动并登录。
-2. 下载 **Shorekeeper-DeepSeek-Windows-v0.1.1.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
+2. 下载 **Shorekeeper-DeepSeek-Windows-v0.1.2.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
 3. 从 DeepSeek 托盘菜单完全退出客户端。桌宠右键 → **外观、声音与迁移 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件**。
 4. 重新打开 Harness，开始任务。桌宠自动跟随最近活动的会话。
 
@@ -78,3 +78,9 @@ python -m venv .venv
 node --test integrations/deepseek/state.test.js
 .venv\Scripts\python tools\build_portable.py
 ```
+
+## 版本更新
+
+每次启动后会在后台检查 GitHub 正式版本，发现新版时弹出提示。也可右键桌宠 → **检查更新…**，或在 **外观、声音与迁移 → 版本与更新** 中手动检查、关闭启动检查、恢复已忽略版本的提醒。
+
+提示中可打开更新页面、备份配置与素材、稍后提醒或忽略当前新版。检查不会下载或覆盖文件。更新时请选择适用于当前版本的**程序补丁**，退出桌宠后覆盖程序目录；GIF、音频、气泡、字体和个人设置会保留。使用**完整包**时请解压到新目录，再导入已导出的配置与素材包。

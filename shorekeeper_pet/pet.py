@@ -21,6 +21,7 @@ from .sizing import SizeDialog,normalize_scale
 from .presentation_size import EdgeResize
 from .media_library import load_catalog
 from .presets import load_defaults,default_bindings
+from .update_ui import UpdateController
 
 SETTINGS=ROOT/'settings.json'
 STATES={
@@ -186,8 +187,9 @@ class Pet(PetRenderer,QWidget):
         self.icon=QIcon(str(ROOT/'assets/shorekeeper.ico'))
         if self.icon.isNull(): self.icon=QIcon(QPixmap.fromImage(icon_im))
         self.setWindowIcon(self.icon); QApplication.instance().setWindowIcon(self.icon)
+        self.updates=UpdateController(self)
         self.tray=QSystemTrayIcon(self.icon,self); self.tray.setToolTip('守岸人 · DeepSeek · 点击唤醒/隐藏')
-        menu=QMenu(); menu.addAction('显示 / 隐藏',self.toggle_visible); menu.addAction('调整大小…',self.open_size); menu.addAction('自动跟随当前任务',lambda:self.select_thread('auto')); menu.addAction('陪伴面板',self.open_panel); menu.addAction('交互工作室',self.open_bindings); menu.addAction('外观、声音与迁移',self.open_preferences); menu.addAction('刷新余额',self.refresh_quota); menu.addSeparator(); menu.addAction('退出守岸人',self.shutdown); self.tray.setContextMenu(menu)
+        menu=QMenu(); menu.addAction('显示 / 隐藏',self.toggle_visible); menu.addAction('调整大小…',self.open_size); menu.addAction('自动跟随当前任务',lambda:self.select_thread('auto')); menu.addAction('陪伴面板',self.open_panel); menu.addAction('交互工作室',self.open_bindings); menu.addAction('外观、声音与迁移',self.open_preferences); menu.addAction('刷新余额',self.refresh_quota); menu.addAction('检查更新…',lambda:self.updates.check(True)); menu.addSeparator(); menu.addAction('退出守岸人',self.shutdown); self.tray.setContextMenu(menu)
         self.tray.activated.connect(lambda reason:self.toggle_visible() if reason==QSystemTrayIcon.ActivationReason.Trigger else None)
         if not offline: self.tray.show()
         self.timer=QTimer(self); self.timer.setInterval(25); self.timer.timeout.connect(self.tick); self.timer.start()
@@ -198,6 +200,7 @@ class Pet(PetRenderer,QWidget):
         if not offline:
             threading.Thread(target=self.watch_status,daemon=True).start()
             threading.Thread(target=self.watch_quota,daemon=True).start()
+            self.updates.schedule()
 
     def get_animation(self, aid):
         if aid not in self.cache:
@@ -452,6 +455,7 @@ class Pet(PetRenderer,QWidget):
         menu.addAction('外观、声音与迁移',self.open_preferences)
         follow=menu.addAction('自动跟随当前任务',lambda:self.select_thread('auto')); follow.setCheckable(True); follow.setChecked(self.monitor.selected=='auto')
         menu.addAction('刷新余额',self.refresh_quota); menu.addAction('打开 DeepSeek Harness',self.open_deepseek)
+        menu.addAction('检查更新…',lambda:self.updates.check(True))
         quiet=menu.addAction('安静陪伴'); quiet.setCheckable(True); quiet.setChecked(self.quiet); quiet.triggered.connect(self.set_quiet)
         menu.addSeparator(); menu.addAction('暂时收起（托盘恢复）',self.hide); menu.addAction('退出守岸人',self.shutdown); return menu
 
@@ -586,6 +590,7 @@ class Pet(PetRenderer,QWidget):
         else: self.show(); self.raise_()
 
     def shutdown(self):
+        self.updates.close()
         self.stop_event.set(); self.refresh_event.set(); self.timer.stop(); self.tray.hide()
         self.voice.stop(); self.save_settings()
         self.rate_client.close(); QApplication.instance().exit(0)
@@ -595,13 +600,20 @@ class Pet(PetRenderer,QWidget):
 
     def write_health(self):
         data=dict(version=VERSION,pid=os.getpid(),updated_at=time.time(),state=self.state,visible=self.isVisible(),quota_source=self.quota_data.get('source'),quota_updated_at=self.quota_data.get('updated_at'),quota_available=bool(self.quota_data.get('wallets')),rate_error=self.quota_data.get('error'),thread_count=len(self.thread_list),animation=self.animation_id,custom_bindings=len(self.bindings.overrides),font=self.options['bubble_font_family'])
+        data.update(update_status=self.updates.status,update_check_pending=self.updates.busy)
         data.update(follow=self.monitor.selected,thread_id=self.live_status.get('thread_id'),live_state=self.live_status.get('state'),owner=self.controller.owner,scale=self.requested_scale,display_scale=self.scale_factor,window_size=[self.width(),self.height()])
         try:
             (ROOT/'runtime.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
         except OSError: pass
 
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument('--preview',action='store_true'); parser.add_argument('--smoke-test',action='store_true'); parser.add_argument('--capture-after',type=int,default=0); parser.add_argument('--bindings',action='store_true'); parser.add_argument('--settings',action='store_true'); parser.add_argument('--verify-package',action='store_true'); parser.add_argument('--verify-connection',action='store_true'); args=parser.parse_args()
+    parser=argparse.ArgumentParser(); parser.add_argument('--preview',action='store_true'); parser.add_argument('--smoke-test',action='store_true'); parser.add_argument('--capture-after',type=int,default=0); parser.add_argument('--bindings',action='store_true'); parser.add_argument('--settings',action='store_true'); parser.add_argument('--verify-package',action='store_true'); parser.add_argument('--verify-update-check',action='store_true'); parser.add_argument('--verify-connection',action='store_true'); args=parser.parse_args()
+    if args.verify_update_check:
+        from .updates import check_latest
+        result=check_latest()
+        report=dict(ok=result.status!='unavailable',status=result.status,latest=result.version,url=result.url,version=VERSION,frozen=bool(getattr(sys,'frozen',False)))
+        (ROOT/'update-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
+        return 0 if report['ok'] else 1
     if args.verify_connection:
         from .bridge import discover_deepseek
         opts=appearance(load_settings()); monitor=Monitor(opts['deepseek_home'] or DSH_HOME); client=RateClient(opts['deepseek_executable'],opts['deepseek_home'])
@@ -645,8 +657,9 @@ def main():
                 from .startup import deepseek_processes
                 frequency_controls=all(pet.binding_editor.controls['audio_policy'].findData(mode)>=0 for mode in ('entry','session','occasional','turn'))
                 startup_control='launch_with_deepseek' in pet.preferences.controls
+                update_controls='check_updates_on_start' in pet.preferences.controls and not pet.updates.timer.isActive()
                 desktop_detected=bool(deepseek_processes())
-                report=dict(ok=len(pet.font_families)>=2 and decoder_ok and output_ok and bubble_bounds and audio_mode and resize_controls and frequency_controls and startup_control,audio_decoder=decoder_ok,audio_output=output_ok,bubble_bounds=bubble_bounds,audio_subtitle_mode=audio_mode,resize_controls=resize_controls,voice_frequency_controls=frequency_controls,startup_control=startup_control,desktop_detected=desktop_detected,version=VERSION,fonts=pet.font_families,assets=len(ASSETS),bindings=len(pet.bindings.overrides),root=str(ROOT),frozen=bool(getattr(sys,'frozen',False)),scale=pet.requested_scale,size_control_percent=pet.size_dialog.control.percent.value())
+                report=dict(ok=len(pet.font_families)>=2 and decoder_ok and output_ok and bubble_bounds and audio_mode and resize_controls and frequency_controls and startup_control and update_controls,update_controls=update_controls,audio_decoder=decoder_ok,audio_output=output_ok,bubble_bounds=bubble_bounds,audio_subtitle_mode=audio_mode,resize_controls=resize_controls,voice_frequency_controls=frequency_controls,startup_control=startup_control,desktop_detected=desktop_detected,version=VERSION,fonts=pet.font_families,assets=len(ASSETS),bindings=len(pet.bindings.overrides),root=str(ROOT),frozen=bool(getattr(sys,'frozen',False)),scale=pet.requested_scale,size_control_percent=pet.size_dialog.control.percent.value())
                 (ROOT/'package-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
             except Exception:
                 import traceback
@@ -662,6 +675,7 @@ def main():
             pet.transition_old=None; pet.tick(); pet.grab().save(str(ROOT/'qa/desktop-preview.png'))
             pet.open_panel(); pet.panel.grab().save(str(ROOT/'qa/panel-preview.png')); app.exit(0)
         QTimer.singleShot(700,capture)
+    app.aboutToQuit.connect(pet.updates.close)
     app.aboutToQuit.connect(pet.stop_event.set)
     app.aboutToQuit.connect(pet.refresh_event.set)
     app.aboutToQuit.connect(pet.rate_client.close)
