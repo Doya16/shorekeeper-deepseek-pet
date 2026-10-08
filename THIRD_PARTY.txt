@@ -35,7 +35,7 @@ Promotional media
 - BGM: 溯而复始 / Shorekeeper character PV soundtrack, produced by 鸣潮先约电台.
   Official source: https://www.bilibili.com/video/BV1jL4PeYEn8/
   The demonstration videos use an excerpt; the full music recording is not bundled.
-- Codex product icon: OpenAI, from the Codex application UI.
+- DeepSeek Harness product icon: DeepSeek, from the official Harness desktop distribution.
   Music and product marks remain the property of their respective owners.
 
 Showcase background

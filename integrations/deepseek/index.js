@@ -13,7 +13,7 @@ export function apply(ctx) {
   const path = join(dir, 'desktop.json'), request = join(dir, 'refresh');
   const state = new PetState(), instance = randomUUID();
   let balance = {status: 'loading', wallets: [], bonus: []}, updated = 0;
-  let disposed = false, busy = false, lastBalance = 0, lastRequest = 0;
+  let disposed = false, busy = false, lastBalance = 0, lastRequest = 0, accountEpoch = 0;
   function flush(connected = true) {
     if (disposed && connected) return;
     try {
@@ -27,17 +27,19 @@ export function apply(ctx) {
   async function refresh() {
     if (busy || disposed) return;
     busy = true; lastBalance = Date.now();
+    const epoch = accountEpoch;
     try {
       const value = await ctx.deepseekAccount.getBalance({version: '0.2.0-rc.2', locale: 'zh-CN',
         timezoneOffsetSeconds: -new Date().getTimezoneOffset() * 60});
-      if (!disposed) { balance = safeBalance(value); updated = Date.now() / 1000; }
-    } catch { if (!disposed) balance = {status: 'unavailable', wallets: [], bonus: []}; }
+      if (!disposed && epoch === accountEpoch) { balance = safeBalance(value); updated = Date.now() / 1000; }
+    } catch { if (!disposed && epoch === accountEpoch) balance = {status: 'unavailable', wallets: [], bonus: []}; }
     finally { busy = false; flush(); }
   }
   ctx.on('session/event', (session, event) => {
     try { state.accept(session, event); } catch { /* Ignore unsupported event shape. */ }
   });
   ctx.on('deepseek-account/signed-out', () => {
+    accountEpoch++;
     balance = {status: 'signed-out', wallets: [], bonus: []}; updated = Date.now() / 1000; flush();
   });
   ctx.effect(() => {

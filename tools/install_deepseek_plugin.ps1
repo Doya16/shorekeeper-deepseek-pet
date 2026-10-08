@@ -16,7 +16,7 @@ foreach ($name in @('package.json','cordis.patch.yml','cordis.yml','pnpm-lock.ya
     if (Test-Path -LiteralPath $source) { Copy-Item -LiteralPath $source -Destination (Join-Path $backup $name) }
 }
 $env:DSH_HOME = $DataHome
-$archive = Join-Path $root 'integrations\deepseek\dsh-shorekeeper-pet-0.1.1.tgz'
+$archive = Join-Path $root 'integrations\deepseek\dsh-shorekeeper-pet-0.1.2.tgz'
 if (-not (Test-Path -LiteralPath $archive)) { throw 'The plugin package is missing. Re-extract the complete pet bundle.' }
 $manifest = Get-Content -LiteralPath (Join-Path $profileDir 'package.json') -Raw | ConvertFrom-Json
 if ($manifest.dependencies -and $manifest.dependencies.PSObject.Properties.Name -contains 'dsh-shorekeeper-pet') {

@@ -1,6 +1,36 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {PetState, safeBalance} from './state.js';
+test('native tool results clear the matching call while other calls remain active', () => {
+  let now = 10; const s = new PetState(() => now);
+  const emit = (type,data) => s.accept({id:'contract'}, {type,data});
+  emit('turn/start',{turn:1});
+  emit('tool/call',{callId:'read',name:'read_file'});
+  emit('tool/call',{callId:'write',name:'write_file'});
+  emit('tool/result',{turn:1,step:1,message:{role:'tool',toolCallId:'write',content:'SECRET'}});
+  assert.equal(s.snapshot().sessions[0].state,'reading');
+  emit('tool/result',{turn:1,step:1,message:{role:'tool',toolCallId:'read'}});
+  now += 2; assert.equal(s.snapshot().sessions[0].state,'thinking');
+  assert.equal(s.sessions.get('contract').tools.size,0);
+  assert.ok(!JSON.stringify(s.snapshot()).includes('SECRET'));
+  emit('tool/ptc-dispatch-start',{subCallId:'sub',name:'edit_file'});
+  emit('tool/ptc-dispatch',{subCallId:'sub'});
+  now += 2; assert.equal(s.snapshot().sessions[0].state,'thinking');
+});
+test('waiting survives parallel tool results and multiple approval decisions', () => {
+  const s = new PetState(() => 20);
+  const emit = (type,data={}) => s.accept({id:'approval'}, {type,data});
+  emit('turn/start',{turn:1});
+  emit('tool/call',{callId:'ask',name:'ask_user'});
+  emit('tool/call',{callId:'read',name:'read_file'});
+  assert.equal(s.snapshot().sessions[0].state,'waiting');
+  emit('approval/asked',{id:'first'}); emit('approval/asked',{id:'second'});
+  emit('tool/result',{message:{toolCallId:'ask'}});
+  emit('approval/decided',{id:'first',outcome:'allowed-once'});
+  emit('step/start'); assert.equal(s.snapshot().sessions[0].state,'waiting');
+  emit('approval/decided',{id:'second',outcome:'rejected'});
+  assert.equal(s.snapshot().sessions[0].state,'reading');
+});
 const session = {id: 'a', header: {}};
 test('parallel sessions complete separately, tasks retain turn identity', () => {
   const s = new PetState(() => 10);
@@ -8,7 +38,7 @@ test('parallel sessions complete separately, tasks retain turn identity', () => 
   emit('turn/start', {turn: 1}); emit('turn/start', {turn: 1}, {id: 'b'});
   emit('tool/call', {callId: 'r', name: 'read_file', arguments: 'SECRET'});
   assert.equal(s.snapshot().sessions[0].state, 'reading');
-  emit('tool/result', {callId: 'r'});
+  emit('tool/result', {message: {role:'tool', toolCallId: 'r'}});
   emit('tool/call', {callId: 'e', name: 'edit_file'});
   assert.equal(s.snapshot().sessions[0].state, 'writing');
   assert.equal(s.snapshot().sessions[0].turn_id, '1');
@@ -22,7 +52,7 @@ test('approval, errors, cancel, subagents, repair, tool holds', () => {
   const e = (type, data = {}) => s.accept(session, {type, data});
   e('turn/start', {turn: 1}); e('tool/call', {name: 'read_file', callId: 'a'});
   e('approval/asked'); assert.equal(s.snapshot().sessions[0].state, 'waiting');
-  e('approval/decided'); e('tool/result', {callId: 'a'});
+  e('approval/decided'); e('tool/result', {message: {role:'tool', toolCallId: 'a'}});
   assert.equal(s.snapshot().sessions[0].state, 'reading'); now += 2;
   assert.equal(s.snapshot().sessions[0].state, 'thinking');
   e('turn/end', {reason: {kind: 'error'}}); assert.equal(s.events[0].state, 'error');

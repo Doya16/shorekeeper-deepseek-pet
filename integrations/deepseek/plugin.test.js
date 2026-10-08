@@ -5,6 +5,25 @@ import {join,resolve,sep} from 'node:path';
 import {tmpdir} from 'node:os';
 import {apply} from './index.js';
 
+test('a late balance response cannot resurrect a signed-out account', async () => {
+  const dir=mkdtempSync(join(tmpdir(),'shorekeeper-account-'));
+  const previous=process.env.DSH_HOME; process.env.DSH_HOME=dir;
+  const listeners={},cleanups=[]; let finish;
+  try {
+    apply({sessions:{},deepseekAccount:{getBalance:()=>new Promise(r=>{finish=r;})},
+      on:(type,handler)=>{listeners[type]=handler;},effect:run=>cleanups.push(run())});
+    listeners['deepseek-account/signed-out']();
+    finish({status:'ready',value:[{currency:'CNY',balance:'9'}]});
+    await new Promise(resolve=>setTimeout(resolve,10));
+    const state=JSON.parse(readFileSync(join(dir,'shorekeeper-pet/desktop.json'),'utf8'));
+    assert.equal(state.balance.status,'signed-out'); assert.deepEqual(state.balance.wallets,[]);
+  } finally {
+    for(const cleanup of cleanups)cleanup();
+    if(previous===undefined)delete process.env.DSH_HOME;else process.env.DSH_HOME=previous;
+    assert.ok(resolve(dir).startsWith(resolve(tmpdir())+sep));rmSync(dir,{recursive:true,force:true});
+  }
+});
+
 test('plugin lifecycle safely projects balance and real event shapes, disposes heartbeat', async () => {
   const dir=mkdtempSync(join(tmpdir(),'shorekeeper-host-'));
   const previous=process.env.DSH_HOME; process.env.DSH_HOME=dir;
