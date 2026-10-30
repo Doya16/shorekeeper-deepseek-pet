@@ -2,7 +2,7 @@
 
 **A companion for the official DeepSeek Harness Windows client, with custom expressions, voice clips, and speech bubbles.**
 
-[Download for Windows](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/latest) · [Watch the demo](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.1.0/shorekeeper-landscape-deepseek-v010.mp4) · [User guide (Chinese)](docs/USAGE.md) · [Report an issue](https://github.com/Doya16/shorekeeper-deepseek-pet/issues) · [中文](README.md)
+[Download for Windows](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/latest) · [Watch the demo](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051.mp4) · [User guide (Chinese)](docs/USAGE.md) · [Report an issue](https://github.com/Doya16/shorekeeper-deepseek-pet/issues) · [中文](README.md)
 
 ![Shorekeeper DeepSeek Desktop Pet: custom expressions and voice interactions](docs/social/cover-landscape.jpg)
 
@@ -12,13 +12,32 @@ For **Windows 10/11 x64**. The complete package includes **three packs with 83 G
 
 ## Preview
 
-![Task stages and separate completion notifications](docs/social/showcase.gif)
+![Current task interactions and new desktop controls](docs/social/showcase.gif)
 
-[Landscape demo](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.1.0/shorekeeper-landscape-deepseek-v010.mp4) · [Portrait demo](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.1.0/shorekeeper-portrait-deepseek-v010.mp4)
+[Landscape · 1920×1080](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051.mp4) · [Portrait · 1080×1920](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-portrait-v051.mp4)
 
-Recorded with **v0.1.0**, the roughly two-minute demo covers task states, concurrent completion notifications, mouse interactions, GIF selection, voice/caption pairs, playback frequency, resizing, account balance, and portable export. The Harness window, projects, dialogue, and balance are simulated examples; the pet and settings show actual widgets from that release. Later features, including update notifications, are described below.
+The **03:17** walkthrough uses **v0.5.1**, with new recordings of the pet and current settings. It covers task interactions, multiple conversation notifications, custom media, lock and click-through, mute, balance refresh, sizing, app icons, client lifecycle, update sources, and complete migration. Portrait and landscape use separate layouts.
+
+**The client window, tasks, balances and available-update notification are examples.** Pet animations and settings are rendered from the current application. The video uses Chinese labels and character voices.
+
+| Time | Demonstration |
+| --- | --- |
+| 00:01 | Task states and one opening voice per turn |
+| 00:30 | Separate completion notifications |
+| 00:50 | Dragging, dropping, double-clicking and head pats |
+| 01:06 | Hover lock, click-through, fade and mute |
+| 01:24 | Visible balance refresh and account display |
+| 01:36 | GIFs, playback, paired audio/captions and frequency |
+| 02:14 | Sizing, fonts and app-badged icons |
+| 02:31 | Client lifecycle, update notifications and download sources |
+| 02:53 | Save, migration and desktop shortcuts |
+| 03:09 | Download and setup |
 
 ![One conversation finishes while another continues editing](docs/social/multi-project.jpg)
+
+| Lock and click-through | Visible balance refresh |
+| --- | --- |
+| ![Hover lock and fade](docs/social/lock-click-through.jpg) | ![Inline refresh state](docs/social/balance-refresh.jpg) |
 
 ## Get started
 

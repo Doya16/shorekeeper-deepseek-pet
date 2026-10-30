@@ -2,7 +2,7 @@
 
 让守岸人陪你使用 **DeepSeek Harness 官方 Windows 客户端**。任务进行时换表情，完成后用语音和气泡回应。
 
-[Windows 下载](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/latest) · [完整演示](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.1.0/shorekeeper-landscape-deepseek-v010.mp4) · [使用指南](docs/USAGE.md) · [English](README.en.md)
+[Windows 下载](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/latest) · [完整演示](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051.mp4) · [使用指南](docs/USAGE.md) · [English](README.en.md)
 
 ![守岸人 DeepSeek 桌宠：自选表情与语音互动](docs/social/cover-landscape.jpg)
 
@@ -10,15 +10,34 @@
 
 适用于 **Windows 10/11 x64**。完整包内置 **三套 83 个 GIF、40 个音频文件、54 组语音字幕配对和两款字体**，无需安装 Python。可与 [Codex 版](https://github.com/Doya16/shorekeeper-codex-pet) 同时使用，分别保存设置。
 
-## 看看她能做什么
+## 效果预览
 
-![任务状态与多会话完成提醒](docs/social/showcase.gif)
+![最新版任务互动、锁定穿透与额度刷新](docs/social/showcase.gif)
 
-[横屏演示](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.1.0/shorekeeper-landscape-deepseek-v010.mp4) · [竖屏演示](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.1.0/shorekeeper-portrait-deepseek-v010.mp4)
+[横屏演示 · 1920×1080](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051.mp4) · [竖屏演示 · 1080×1920](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-portrait-v051.mp4)
 
-演示录制于 **v0.1.0**，约两分钟：任务状态、多会话提醒、拖动与摸头、自选 GIF、语音字幕配对、声音频率、大小调整、账户余额、连接与打包迁移。视频中的 Harness 窗口、项目、对话与余额为模拟示例；桌宠和设置展示录制版本的实际界面。启动检查更新等后续功能见下方说明。
+演示对应 **v0.5.1**，时长 **03:17**。全部换成当前桌宠与设置界面，展示任务跟随、多会话完成提醒、自选素材、语音字幕、锁定穿透、快捷静音、余额刷新、大小字体、图标、启停联动、更新来源与完整迁移。横屏、竖屏分别排版。
 
-![一个会话先完成，另一个继续编辑](docs/social/multi-project.jpg)
+**客户端窗口、任务、余额和新版提醒为示例；桌宠与设置为当前版本实际界面。**
+
+| 时间 | 展示内容 |
+| --- | --- |
+| 00:01 | 跟随任务 |
+| 00:30 | 多个会话 |
+| 00:50 | 桌面互动 |
+| 01:06 | 更轻巧的陪伴 |
+| 01:24 | 额度与余额 |
+| 01:36 | 自己搭配 |
+| 02:14 | 外观与摆放 |
+| 02:31 | 启停与更新 |
+| 02:53 | 保存与迁移 |
+| 03:09 | 下载与使用 |
+
+![一个会话完成时，另一个继续编辑](docs/social/multi-project.jpg)
+
+| 锁定、淡化与点击穿透 | 底部余额框刷新反馈 |
+| --- | --- |
+| ![悬停小锁与点击穿透](docs/social/lock-click-through.jpg) | ![余额框内显示刷新中](docs/social/balance-refresh.jpg) |
 
 ## 开始使用
 
