@@ -4,7 +4,7 @@ root=pathlib.Path(__file__).resolve().parents[1]
 subprocess.run([sys.executable,str(root/'tools/package_plugin.py')],check=True)
 sys.path.insert(0,str(root))
 from shorekeeper_pet.paths import APP_NAME,PORTABLE_DIRNAME
-args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--windowed','--name',APP_NAME,'--icon',str(root/'assets/shorekeeper.ico'),'--version-file',str(root/'tools/windows_version.txt'),'--paths',str(root),'--distpath',str(root/'dist'),'--workpath',str(root/'build'),'--specpath',str(root/'build')]
+args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--windowed','--name',APP_NAME,'--icon',str(root/'resources/icons/app.ico'),'--version-file',str(root/'tools/windows_version.txt'),'--paths',str(root),'--distpath',str(root/'dist'),'--workpath',str(root/'build'),'--specpath',str(root/'build')]
 for module in ('pandas','scipy','matplotlib','tkinter','PySide6.QtWebEngineCore','PySide6.QtQml'): args+=['--exclude-module',module]
 args+=[str(root/'tools/run_pet.py')]
 # Do not let unrelated developer tools supply DLLs with system-library names.
@@ -19,7 +19,7 @@ if named.exists():
     assert named.resolve().parent==(root/'dist').resolve()
     shutil.rmtree(named)
 dest.rename(named); dest=named
-for folder in ('assets','fonts','licenses','defaults'):
+for folder in ('assets','fonts','licenses','defaults','resources'):
     if (root/folder).is_dir(): shutil.copytree(root/folder,dest/folder,dirs_exist_ok=True)
 (dest/'audio').mkdir(exist_ok=True)
 for name in ('README.md','MIGRATION.txt','THIRD_PARTY.txt','requirements.txt'): shutil.copy2(root/name,dest/name)

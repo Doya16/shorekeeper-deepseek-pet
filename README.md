@@ -23,11 +23,20 @@
 ## 开始使用
 
 1. 从 [DeepSeek 官网](https://www.deepseek.com/harness/) 下载 Windows 客户端，启动并登录。
-2. 下载 **Shorekeeper-DeepSeek-Windows-v0.3.0.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
+2. 下载 **Shorekeeper-DeepSeek-Windows-v0.4.0.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
 3. 从 DeepSeek 托盘菜单完全退出客户端。桌宠右键 → **设置 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件**。
 4. 重新打开 Harness，开始任务。桌宠自动跟随最近活动的会话。
 
 更新连接插件时重复第 3、4 步。无需额外填写 API Key。兼容验证目标：DeepSeek Harness 0.2.0-rc.2 / Windows x64。
+
+## 图标与桌面快捷方式
+
+- 默认图标在守岸人右下角显示 APP 小标：**Codex 使用黑白 GPT 图标，DeepSeek 使用蓝色鲸鱼**。
+- 在 **设置 → 桌面与声音 → 底部栏与托盘图标** 中选择 **纯净图标 / APP 小标**，立即生效，选择随配置保存和迁移。
+- 完整解压后，首次启动 Windows 版会自动创建桌面快捷方式。误删后，在 **设置 → 保存与迁移 → 创建桌面快捷方式** 中重新创建。
+- 换电脑后先完整解压、启动一次；快捷方式指向新电脑上的程序位置。
+
+![图标样式与桌面快捷方式设置](docs/demo/shortcut-settings.png)
 
 ## 设置、静音与锁定
 
@@ -48,7 +57,7 @@
 
 ## 检查更新与保留配置升级
 
-当前版本：**v0.3.0**。每次启动桌宠后，自动在后台检查 GitHub 正式版本；发现新版才弹出提示。右键 → **设置 → 版本与更新 → 立即检查更新** 可随时手动检查。
+当前版本：**v0.4.0**。每次启动桌宠后，自动在后台检查 GitHub 正式版本；发现新版才弹出提示。右键 → **设置 → 版本与更新 → 立即检查更新** 可随时手动检查。
 
 在 **设置 → 版本与更新** 中，可关闭启动检查、立即检查或恢复已忽略版本的提醒。新版提示支持 **打开更新页面、备份配置与素材、稍后提醒、忽略此版本**。网络检查失败不会打断桌宠。
 
@@ -58,8 +67,8 @@
 
 | 当前情况 | 如何更新 |
 | --- | --- |
-| 已有 v0.2.1 | 下载 [v0.3.0 程序补丁](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.3.0/Shorekeeper-DeepSeek-Settings-Patch-v0.3.0.zip)，退出桌宠，将补丁解压到原目录并覆盖同名文件，然后重新启动 |
-| 首次使用，或安装了其他旧版 | 下载 [v0.3.0 完整包](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.3.0/Shorekeeper-DeepSeek-Windows-v0.3.0.zip)，解压到新目录；已有配置时，再导入自己导出的配置与素材 ZIP |
+| 已有 v0.3.0 | 下载 [v0.4.0 程序补丁](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Settings-Patch-v0.4.0.zip)，退出桌宠，将补丁解压到原目录并覆盖同名文件，然后重新启动 |
+| 首次使用，或安装了其他旧版 | 下载 [v0.4.0 完整包](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Windows-v0.4.0.zip)，解压到新目录；已有配置时，再导入自己导出的配置与素材 ZIP |
 
 程序补丁保留 **GIF / 图片、音频、气泡字幕、字体和个人设置**。更新前可在 **保存与迁移 → 导出配置与素材包（ZIP）** 留一份备份。程序补丁直接解压覆盖，不在设置中导入。
 

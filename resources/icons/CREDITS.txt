@@ -1,0 +1,3 @@
+Pet artwork: https://emoji.wuwa.games/ (see THIRD_PARTY.txt).
+DeepSeek mark: DeepSeek Harness favicon, blue variant used to identify the connected app.
+This project is independent and is not an official app.

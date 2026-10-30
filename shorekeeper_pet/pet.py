@@ -136,7 +136,8 @@ class Pet(PetRenderer,QWidget):
         self.lock_button=LockButton(self)
         self.pointer_mode=PointerMode(self)
         icon_im=self.animation.frames[0].scaled(64,64,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
-        self.icon=QIcon(str(ROOT/'assets/shorekeeper.ico'))
+        from .app_icons import application_icon
+        self.icon=application_icon(ROOT,self.options['tray_icon_style'])
         if self.icon.isNull(): self.icon=QIcon(QPixmap.fromImage(icon_im))
         self.setWindowIcon(self.icon); QApplication.instance().setWindowIcon(self.icon)
         self.updates=UpdateController(self)
@@ -491,6 +492,7 @@ class Pet(PetRenderer,QWidget):
             configure(bool(value),ROOT)
         self.options[key]=value; self.settings['appearance']=dict(self.options); self.options=appearance(self.settings)
         ok=self.save_settings(); self.apply_style(); self.update_layout(); self.update()
+        if key=='tray_icon_style':self.apply_icon()
         if (key=='audio_enabled' and not value) or (key=='audio_muted' and value): self.voice.stop()
         if key=='interaction_locked' and value: self.cancel_pointer_interaction()
         if key in ('audio_muted','interaction_locked') and self.preferences: self.preferences.refresh_controls()
@@ -513,6 +515,13 @@ class Pet(PetRenderer,QWidget):
         self.update_layout(); self.update()
         if on: self.show()
 
+    def apply_icon(self):
+        from .app_icons import application_icon
+        icon=application_icon(ROOT,self.options['tray_icon_style'])
+        if icon.isNull():return
+        self.icon=icon;QApplication.instance().setWindowIcon(icon);self.tray.setIcon(icon)
+        for window in QApplication.topLevelWidgets():window.setWindowIcon(icon)
+
     def apply_style(self):
         QApplication.instance().setFont(font(self.options['font_family'],self.options['ui_font_size']))
         for dialog in (self.panel,self.binding_editor,self.preferences,self.size_dialog):
@@ -531,7 +540,7 @@ class Pet(PetRenderer,QWidget):
         if self.locked: self.cancel_pointer_interaction()
         self.requested_scale=normalize_scale(data.get('scale',1)); self.scale_factor=self.requested_scale
         self.font_families=load_fonts(ROOT); self.monitor.selected=data.get('thread','auto'); self.cache.clear(); self.animation=self.get_animation(self.binding(self.state)['asset']); self.animation_id=self.binding(self.state)['asset']
-        self.set_top(bool(data.get('on_top',True))); self.save_settings(); self.clear_override(); self.apply_style(); self.update_layout(); self.refresh_quota()
+        self.set_top(bool(data.get('on_top',True))); self.save_settings(); self.clear_override(); self.apply_style(); self.apply_icon(); self.update_layout(); self.refresh_quota()
         if self.binding_editor: self.binding_editor.populate_gallery(); self.binding_editor.load_selection()
 
     def set_pack(self,pack):
@@ -632,6 +641,9 @@ def main():
             try:configure(True,ROOT)
             except OSError:pass
     pet=Pet(offline=args.preview or args.smoke_test or args.verify_package); pet.show()
+    if not pet.offline and getattr(sys,'frozen',False):
+        from .shortcuts import ensure_first_launch_shortcut
+        threading.Thread(target=ensure_first_launch_shortcut,args=(ROOT,),daemon=True).start()
     if args.bindings: pet.open_bindings()
     if args.settings: pet.open_preferences()
     health_timer=QTimer(); health_timer.timeout.connect(pet.write_health)

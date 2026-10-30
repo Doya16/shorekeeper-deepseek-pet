@@ -246,6 +246,23 @@ class SettingsControlsTests(unittest.TestCase):
             QApplication.sendEvent(p,QHelpEvent(QEvent.Type.ToolTip,point,p.mapToGlobal(point)))
         self.assertIn('1小时2分钟后',p.toolTip())
 
+    def test_icon_choice_applies_immediately_and_survives_export_import(self):
+        from shorekeeper_pet.paths import ROOT as actual_root
+        shutil.copytree(actual_root/'resources',self.root/'resources')
+        shutil.copy2(actual_root/'assets/shorekeeper.ico',self.root/'assets/shorekeeper.ico')
+        p=self.pet;p.open_preferences('桌面与声音');control=p.preferences.controls['tray_icon_style']
+        control.setCurrentIndex(control.findData('clean'));clean=p.tray.icon().pixmap(32,32).toImage()
+        control.setCurrentIndex(control.findData('badged'));badged=p.tray.icon().pixmap(32,32).toImage()
+        self.assertNotEqual(clean,badged)
+        for icon in (p.icon,p.windowIcon(),p.preferences.windowIcon(),self.app.windowIcon()):self.assertEqual(icon.pixmap(32,32).toImage(),badged)
+        control.setCurrentIndex(control.findData('clean'))
+        cfg=module.load_settings();archive=self.root.parent/'icons.zip';self.assertEqual(export_bundle(archive,cfg,self.root),[])
+        restored=import_bundle(archive,self.root.parent/'图标迁移')
+        self.assertEqual(restored['appearance']['tray_icon_style'],'clean')
+        p.set_option('tray_icon_style','badged');p.apply_settings(restored)
+        self.assertEqual(p.tray.icon().pixmap(32,32).toImage(),clean)
+        self.assertIn('创建桌面快捷方式',[b.text() for b in p.preferences.buttons])
+
     def test_legacy_quiet_migrates_and_explicit_new_preference_wins(self):
         self.assertTrue(migrate_settings({'quiet':True})['appearance']['audio_muted'])
         self.assertFalse(migrate_settings({'quiet':True,'appearance':{'audio_muted':False}})['appearance']['audio_muted'])

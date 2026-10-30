@@ -23,11 +23,19 @@ Recorded with **v0.1.0**, the roughly two-minute demo covers task states, concur
 ## Get started
 
 1. Install the Windows client from the [official DeepSeek Harness website](https://www.deepseek.com/harness/), open it, and sign in.
-2. Download [Shorekeeper-DeepSeek-Windows-v0.3.0.zip](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.3.0/Shorekeeper-DeepSeek-Windows-v0.3.0.zip), extract it completely, and run **守岸人DeepSeek桌宠启动.exe**.
+2. Download [Shorekeeper-DeepSeek-Windows-v0.4.0.zip](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Windows-v0.4.0.zip), extract it completely, and run **守岸人DeepSeek桌宠启动.exe**.
 3. Fully quit Harness from its tray menu. Right-click the pet → **设置 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件** (Settings → Connect to DeepSeek → Install / Update Harness Connection Plugin).
 4. Reopen Harness and start a task. The pet follows the most recently active conversation.
 
 Repeat steps 3–4 when updating the connection plugin. No additional API key is required. The tested client is **DeepSeek Harness 0.2.0-rc.2 / Windows x64**.
+
+## App badges and desktop shortcuts
+
+The default pet icon has a small app badge: a black-and-white GPT mark for Codex, or a blue whale for DeepSeek. Under **设置 → 桌面与声音 → 底部栏与托盘图标**, choose **纯净图标** (plain) or **APP 小标** (badged). The taskbar/window and tray icons update immediately, and the preference travels with your settings.
+
+The extracted Windows app creates a desktop shortcut on its first normal launch. If deleted, recreate it under **设置 → 保存与迁移 → 创建桌面快捷方式**. On another computer, extract the complete package and run it once to create a shortcut pointing to its new location.
+
+![Desktop shortcut settings](docs/demo/shortcut-settings.png)
 
 ## Settings, mute and lock
 
@@ -46,7 +54,7 @@ Right-click the pet or tray icon → **设置…** (Settings). One window contai
 
 ## Checking for updates and keeping your settings
 
-Current version: **v0.3.0**. After each launch, the pet checks GitHub for a stable release and prompts you when a newer one is available. Right-click → **设置 → 版本与更新 → 立即检查更新** (Check for updates) to check manually.
+Current version: **v0.4.0**. After each launch, the pet checks GitHub for a stable release and prompts you when a newer one is available. Right-click → **设置 → 版本与更新 → 立即检查更新** (Check for updates) to check manually.
 
 Open **设置 → 版本与更新** (Settings → Version & Updates) to disable startup checks, check immediately, or restore ignored version reminders. A new-version prompt lets you open the release page, back up settings and media, remind you later, or ignore that version. A failed background check does not interrupt the pet.
 
@@ -56,8 +64,8 @@ Open **设置 → 版本与更新** (Settings → Version & Updates) to disable 
 
 | Your installation | How to update |
 | --- | --- |
-| v0.2.1 | Download the [v0.3.0 program patch](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.3.0/Shorekeeper-DeepSeek-Settings-Patch-v0.3.0.zip), exit the pet, extract over its existing folder, and restart |
-| New installation or another older version | Extract the [v0.3.0 full package](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.3.0/Shorekeeper-DeepSeek-Windows-v0.3.0.zip) into a new folder, then import your exported settings and assets ZIP if you have one |
+| v0.3.0 | Download the [v0.4.0 program patch](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Settings-Patch-v0.4.0.zip), exit the pet, extract over its existing folder, and restart |
+| New installation or another older version | Extract the [v0.4.0 full package](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Windows-v0.4.0.zip) into a new folder, then import your exported settings and assets ZIP if you have one |
 
 The program patch preserves **GIFs / images, audio, bubble captions, fonts, and personal settings**. Before updating, use **保存与迁移 → 导出配置与素材包（ZIP）** (Save & Migrate → Export Settings & Assets ZIP) to keep a backup. Extract program patches into the application folder; do not import them as settings.
 

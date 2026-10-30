@@ -1,4 +1,5 @@
-param([string]$Destination = [Environment]::GetFolderPath('Desktop'))
+param([string]$Destination = [Environment]::GetFolderPath('Desktop'), [string]$Target = '')
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false)
 $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
@@ -26,6 +27,15 @@ interface IShellLinkW {
 }
 public static class PetShortcut {
     public static void Create(string destination, string target, string directory) {
+        if(System.IO.File.Exists(destination)) {
+            var existing=(IShellLinkW)new ShellLink();
+            try {
+                ((IPersistFile)existing).Load(destination,0);
+                var path=new StringBuilder(32768); existing.GetPath(path,path.Capacity,IntPtr.Zero,4);
+                if(!String.Equals(System.IO.Path.GetFileName(path.ToString()),System.IO.Path.GetFileName(target),StringComparison.OrdinalIgnoreCase))
+                    throw new Exception("An unrelated shortcut already has this name");
+            } finally { Marshal.FinalReleaseComObject(existing); }
+        }
         var link=(IShellLinkW)new ShellLink();
         try {
             link.SetPath(target); link.SetWorkingDirectory(directory);
@@ -37,6 +47,8 @@ public static class PetShortcut {
             ((IPersistFile)loaded).Load(destination,0);
             var path=new StringBuilder(32768); loaded.GetPath(path,path.Capacity,IntPtr.Zero,4);
             if(path.ToString()!=target) throw new Exception("Shortcut target verification failed");
+            var directoryCheck=new StringBuilder(32768); loaded.GetWorkingDirectory(directoryCheck,directoryCheck.Capacity);
+            if(directoryCheck.ToString()!=directory) throw new Exception("Shortcut working directory verification failed");
             var icon=new StringBuilder(32768); int index; loaded.GetIconLocation(icon,icon.Capacity,out index);
             if(icon.ToString()!=target || index!=0) throw new Exception("Shortcut icon verification failed");
         } finally { Marshal.FinalReleaseComObject(loaded); }
@@ -44,8 +56,10 @@ public static class PetShortcut {
 }
 '@
 $root = Split-Path -Parent $PSScriptRoot
-$exe = Get-ChildItem -LiteralPath $root -Filter *.exe | Where-Object { $_.VersionInfo.InternalName -eq 'shorekeeper_pet' } | Select-Object -First 1
+if ($Target) { $exe = Get-Item -LiteralPath $Target; if ($exe.VersionInfo.InternalName -ne 'shorekeeper_pet' -or $exe.DirectoryName -ne $root) { throw 'Invalid pet executable.' } }
+else { $exe = Get-ChildItem -LiteralPath $root -Filter *.exe | Where-Object { $_.VersionInfo.InternalName -eq 'shorekeeper_pet' } | Select-Object -First 1 }
 if (-not $exe) { throw 'Run this tool inside the extracted Windows portable folder.' }
+if (-not (Test-Path -LiteralPath $Destination -PathType Container)) { throw 'Desktop directory not found.' }
 $link = Join-Path $Destination ($exe.BaseName + '.lnk')
 [PetShortcut]::Create($link, $exe.FullName, $root)
-Write-Output 'Shortcut created and verified.'
+@{ shortcut = $link; target = $exe.FullName; workingDirectory = $root; icon = $exe.FullName } | ConvertTo-Json -Compress

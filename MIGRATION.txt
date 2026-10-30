@@ -18,3 +18,5 @@
 移除连接插件：退出 Harness 后，用其 resources/runtime/cli/bin/dsh.cmd 执行
 plugin --profile desktop remove dsh-shorekeeper-pet
 然后重新打开 Harness。桌宠设置和素材不会被删除。
+
+首次正常启动 Windows 版会创建桌面快捷方式。误删后：设置 → 保存与迁移 → 创建桌面快捷方式。图标样式在设置 → 桌面与声音选择，会随配置一起迁移。

@@ -35,6 +35,8 @@ class Preferences(QDialog):
         self.editor=BindingEditor(pet,catalog,assets,root,parent=self.tabs)
         self.tabs.addTab(self.editor,'交互工作室')
         voice=self.tab('桌面与声音')
+        icon_style=QComboBox();icon_style.addItem('APP 小标','badged');icon_style.addItem('纯净图标','clean')
+        icon_style.currentIndexChanged.connect(lambda:self.change('tray_icon_style',icon_style.currentData()));self.controls['tray_icon_style']=icon_style;voice.addRow('底部栏与托盘图标',icon_style)
         muted=QCheckBox('安静陪伴（静音）'); muted.toggled.connect(lambda value:self.change('audio_muted',value)); self.controls['audio_muted']=muted; voice.addRow(muted)
         locked=QCheckBox('锁定桌宠'); locked.toggled.connect(lambda value:self.change('interaction_locked',value)); self.controls['interaction_locked']=locked; voice.addRow(locked)
         voice.addRow('锁定悬停透明度',self.spin('locked_hover_transparency',0,95,' %'))
@@ -52,6 +54,7 @@ class Preferences(QDialog):
         stop=QPushButton('停止当前声音'); stop.clicked.connect(pet.voice.stop); voice.addRow(stop)
         transfer=self.tab('保存与迁移')
         note=QLabel('修改会自动保存。你也可以立即保存快照，或把 GIF、字体、已绑定音频和配置一起打包。便携包还包含 Windows 运行程序。'); note.setWordWrap(True); transfer.addRow(note)
+        self.add_button(transfer,'创建桌面快捷方式',self.create_shortcut)
         self.add_button(transfer,'立即保存全部配置',self.save_now)
         self.add_button(transfer,'保存一份配置快照（JSON）',self.snapshot)
         self.add_button(transfer,'导出配置与素材包（ZIP）',lambda:self.export(False))
@@ -140,6 +143,13 @@ class Preferences(QDialog):
         except OSError as error:
             self.refresh_controls(); self.status.setText('设置未更改：'+str(error))
     def apply_style(self): self.setStyleSheet(stylesheet(self.pet.options)+'QLabel#settingsTitle{font-size:25px;font-weight:600;color:#2e5280;}')
+    def create_shortcut(self):
+        from .shortcuts import create_desktop_shortcut
+        self.set_busy(True);self.status.setText('正在创建桌面快捷方式…')
+        def work():
+            try:self.jobs.finished.emit('桌面快捷方式已创建：'+str(create_desktop_shortcut(ROOT)))
+            except Exception as error:self.jobs.failed.emit('创建失败：'+str(error))
+        threading.Thread(target=work,daemon=True).start()
     def save_now(self): self.status.setText('全部配置已保存' if self.pet.save_settings() else '保存失败')
     def snapshot(self):
         path,_=QFileDialog.getSaveFileName(self,'保存配置快照',str(ROOT/'exports'/('settings-'+datetime.datetime.now().strftime('%Y%m%d-%H%M%S')+'.json')),'JSON (*.json)')

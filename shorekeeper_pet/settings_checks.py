@@ -51,6 +51,24 @@ def verify_controls(pet):
                 set_input_transparent(pet,transparent)
                 style=get(int(pet.winId()),-20)
                 native_input=native_input and bool(style&0x80000) and bool(style&0x20)==transparent
-        return dict(native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
+        from .app_icons import application_icon
+        from .paths import ROOT
+        clean=application_icon(ROOT,'clean').pixmap(32,32).toImage()
+        badged=application_icon(ROOT,'badged').pixmap(32,32).toImage()
+        icon_check=not clean.isNull() and not badged.isNull() and clean!=badged
+        control=pet.preferences.controls['tray_icon_style']
+        for style,expected in (('clean',clean),('badged',badged)):
+            control.setCurrentIndex(control.findData(style))
+            icon_check=icon_check and pet.tray.icon().pixmap(32,32).toImage()==expected and pet.preferences.windowIcon().pixmap(32,32).toImage()==expected
+        from .shortcuts import ensure_first_launch_shortcut,create_desktop_shortcut,marker_path
+        with tempfile.TemporaryDirectory(prefix='shortcut-check-') as directory:
+            directory=pathlib.Path(directory);desktop=directory/'Desktop 中文';desktop.mkdir();state=directory/'state'
+            link=ensure_first_launch_shortcut(ROOT,frozen=True,destination=desktop,state_root=state)
+            shortcut_check=link is not None and link.is_file() and marker_path(ROOT,state).is_file()
+            if link:
+                link.unlink()
+                shortcut_check=shortcut_check and ensure_first_launch_shortcut(ROOT,frozen=True,destination=desktop,state_root=state) is None and not link.exists()
+                shortcut_check=shortcut_check and create_desktop_shortcut(ROOT,desktop,state_root=state).is_file()
+        return dict(icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
     finally:
-        pet.voice.stop();pet.options=original;pet.save_settings();pet.update_layout();pet.preferences.refresh_controls()
+        pet.voice.stop();pet.options=original;pet.apply_icon();pet.save_settings();pet.update_layout();pet.preferences.refresh_controls()

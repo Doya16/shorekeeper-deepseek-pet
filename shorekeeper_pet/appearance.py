@@ -1,6 +1,6 @@
 import math
 from PySide6.QtGui import QFont,QFontDatabase
-DEFAULTS=dict(locked_hover_transparency=70,lock_button_size=100,lock_button_transparency=35,audio_muted=False,interaction_locked=False,check_updates_on_start=True,ignored_update_version='',font_family='LXGW WenKai',bubble_font_family='ZCOOL KuaiLe',bubble_font_size=19,quota_font_size=17,ui_font_size=17,bubble_width=390,bubble_width_ratio=1.0,quota_scale=1.0,pet_size=230,volume=75,audio_enabled=False,audio_cooldown=12,audio_directory='audio',deepseek_home='',deepseek_executable='',launch_with_deepseek=False)
+DEFAULTS=dict(tray_icon_style='badged',locked_hover_transparency=70,lock_button_size=100,lock_button_transparency=35,audio_muted=False,interaction_locked=False,check_updates_on_start=True,ignored_update_version='',font_family='LXGW WenKai',bubble_font_family='ZCOOL KuaiLe',bubble_font_size=19,quota_font_size=17,ui_font_size=17,bubble_width=390,bubble_width_ratio=1.0,quota_scale=1.0,pet_size=230,volume=75,audio_enabled=False,audio_cooldown=12,audio_directory='audio',deepseek_home='',deepseek_executable='',launch_with_deepseek=False)
 
 def load_fonts(root):
     families=[]
@@ -21,6 +21,7 @@ def appearance(settings):
     for key in ('audio_muted','interaction_locked'): result[key]=result[key] is True
     result['check_updates_on_start']=result['check_updates_on_start'] is not False
     if not isinstance(result['ignored_update_version'],str) or len(result['ignored_update_version'])>32:result['ignored_update_version']=''
+    if result['tray_icon_style'] not in ('clean','badged'):result['tray_icon_style']='badged'
     return result
 
 def font(family,size,bold=False):

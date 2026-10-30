@@ -490,7 +490,8 @@
     "interaction_locked": false,
     "lock_button_transparency": 35,
     "lock_button_size": 100,
-    "locked_hover_transparency": 70
+    "locked_hover_transparency": 70,
+    "tray_icon_style": "badged"
   },
   "pack": "163",
   "thread": "auto",
