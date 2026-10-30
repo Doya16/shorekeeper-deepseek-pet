@@ -489,7 +489,8 @@
     "audio_muted": false,
     "interaction_locked": false,
     "lock_button_transparency": 35,
-    "lock_button_size": 100
+    "lock_button_size": 100,
+    "locked_hover_transparency": 70
   },
   "pack": "163",
   "thread": "auto",

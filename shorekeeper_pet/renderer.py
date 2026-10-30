@@ -73,6 +73,7 @@ class PetRenderer:
             if anchor:
                 self.move(round(anchor[0]-self.pet_rect.center().x()*self.scale_factor),round(anchor[1]-self.pet_rect.bottom()*self.scale_factor)); self.clamp_position()
         self.lock_button.position_on_pet()
+        self.pointer_mode.refresh()
         self.setToolTip(self.quota_details()); self.update_bubble(); self.size_changed.emit()
 
     def update_bubble(self):
@@ -102,9 +103,11 @@ class PetRenderer:
         opts=self.options; width=self.scene_width; b=self.binding(self.state)
         elapsed=(time.monotonic()-self.controller.started)*1000
         frame=self.animation.frame(elapsed*b['speed'],playback='once' if self.preview_id else b['playback'])
+        opacity=self.pointer_mode.avatar_opacity
+        p.setOpacity(opacity)
         fraction=(time.monotonic()-self.transition_start)/.20
         if self.transition_old is not None and fraction<1:
-            p.setOpacity(1-fraction*2 if fraction<.5 else (fraction-.5)*2); shown=self.transition_old if fraction<.5 else frame; p.drawImage(self.image_rect(shown),shown)
+            p.setOpacity(opacity*(1-fraction*2 if fraction<.5 else (fraction-.5)*2)); shown=self.transition_old if fraction<.5 else frame; p.drawImage(self.image_rect(shown),shown)
         else: self.transition_old=None; p.drawImage(self.image_rect(frame),frame)
         p.setOpacity(1); self.last_image=frame
         p.save(); p.translate(self.quota_rect.topLeft()); quota_scale=self.quota_display_scale*self.quota_pet_factor; p.scale(quota_scale,quota_scale)

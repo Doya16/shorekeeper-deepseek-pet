@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse, collections, json, math, os, pathlib, random, sys, threading, time
 from datetime import datetime
 from PIL import Image
-from PySide6.QtCore import Qt, QTimer, QRectF, QPoint, QSize, Signal, QObject, QLockFile
+from PySide6.QtCore import Qt, QTimer, QRectF, QPoint, QSize, Signal, QObject, QLockFile, QEvent
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QFont, QImage, QPixmap, QIcon, QAction, QCursor
 from PySide6.QtWidgets import QApplication, QWidget, QMenu, QSystemTrayIcon, QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox, QCheckBox, QGroupBox, QListWidget, QAbstractItemView,QScrollArea
 from .bridge import Monitor, RateClient, ROOT
@@ -23,6 +23,7 @@ from .media_library import load_catalog
 from .presets import load_defaults,default_bindings
 from .update_ui import UpdateController
 from .lock_button import LockButton
+from .pointer_mode import PointerMode
 
 SETTINGS=ROOT/'settings.json'
 STATES={
@@ -131,7 +132,9 @@ class Pet(PetRenderer,QWidget):
         self.hovered=False; self.ignore_release=False
         self.click_timer=QTimer(self); self.click_timer.setSingleShot(True); self.click_timer.timeout.connect(lambda:self.react('pet'))
         self.hover_timer=QTimer(self); self.hover_timer.setSingleShot(True); self.hover_timer.timeout.connect(self.hover_react)
+        self.quota_press=None; self.quota_click_cancelled=False
         self.lock_button=LockButton(self)
+        self.pointer_mode=PointerMode(self)
         icon_im=self.animation.frames[0].scaled(64,64,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
         self.icon=QIcon(str(ROOT/'assets/shorekeeper.ico'))
         if self.icon.isNull(): self.icon=QIcon(QPixmap.fromImage(icon_im))
@@ -305,6 +308,7 @@ class Pet(PetRenderer,QWidget):
                 binding=dict(binding,audio_clips=[dict(self.preview_audio_clip,enabled=True)])
             self.voice.trigger(self.state,binding,self.options,preview=self.controller.owner=='preview',task=task_key(self.notification or self.live_status),notification=self.controller.owner=='notification'); self.update_layout()
         self.lock_button.refresh_visibility()
+        self.pointer_mode.refresh()
         self.update_bubble()
         self.update()
 
@@ -313,10 +317,7 @@ class Pet(PetRenderer,QWidget):
         return balance_label(self.quota_data,compact)
 
     def quota_details(self):
-        lines=[self.quota_label()]
-        for wallet in self.quota_data.get('wallets',[]):
-            lines.append(('赠送余额' if wallet['bonus'] else '充值余额')+' · '+wallet['currency']+' '+wallet['balance'])
-        return '\n'.join(lines)+'\n包含充值与赠送余额；* 表示缓存或刷新失败\n拖动左右两侧调整大小；右键 → 刷新余额'
+        return '*表示额度未更新\n拖动余额框修改大小\n点击余额框刷新余额'
 
     def bubble_text(self):
         if hasattr(self,'bubble_window') and self.bubble_window.edge_resize.active: return self.bubble_window.edge_resize.text
@@ -341,10 +342,19 @@ class Pet(PetRenderer,QWidget):
         for key,value in {'state':self.state_title(self.bubble_state()),'quota':self.quota_label(),'task':context.get('title',''),'progress':context.get('message','')}.items(): text=text.replace('{'+key+'}',value)
         return text
 
+    def event(self,event):
+        if event.type()==QEvent.Type.ToolTip:
+            self.setToolTip(self.quota_details())
+        return super().event(event)
+
     def mousePressEvent(self, event):
-        if self.locked: event.accept(); return
+        self.quota_press=None; self.quota_click_cancelled=False
         if self.quota_resize.begin(event,self.quota_hit_rect(),self.quota_base_width*self.scale_factor):
             self.drag_offset=None; return
+        if event.button()==Qt.MouseButton.LeftButton and self.quota_hit_rect().contains(event.position()):
+            self.hover_timer.stop(); self.click_timer.stop(); self.drag_offset=None
+            self.quota_press=event.globalPosition(); event.accept(); return
+        if self.locked: event.accept(); return
         if event.button()==Qt.MouseButton.LeftButton:
             if not self.pet_rect.contains(event.position()/self.scale_factor): event.accept(); return
             self.hover_timer.stop(); self.click_timer.stop(); self.ignore_release=False
@@ -352,6 +362,10 @@ class Pet(PetRenderer,QWidget):
 
     def mouseMoveEvent(self, event):
         self.lock_button.refresh_visibility()
+        self.pointer_mode.refresh()
+        if self.quota_press is not None:
+            if (event.globalPosition()-self.quota_press).manhattanLength()>QApplication.startDragDistance(): self.quota_click_cancelled=True
+            event.accept(); return
         if self.locked: event.accept(); return
         if self.quota_resize.move(event,self.quota_hit_rect()): return
         if self.drag_offset is not None and event.buttons()&Qt.MouseButton.LeftButton:
@@ -361,8 +375,14 @@ class Pet(PetRenderer,QWidget):
         elif not self.hovered and not self.hover_timer.isActive(): self.hover_timer.start(1000)
 
     def mouseReleaseEvent(self, event):
-        if self.locked: event.accept(); return
         if self.quota_resize.finish(event): return
+        if event.button()==Qt.MouseButton.LeftButton and self.quota_press is not None:
+            moved=(event.globalPosition()-self.quota_press).manhattanLength()>QApplication.startDragDistance()
+            refresh=not moved and not self.quota_click_cancelled and self.quota_hit_rect().contains(event.position())
+            self.quota_press=None
+            if refresh: self.refresh_quota()
+            event.accept(); return
+        if self.locked: event.accept(); return
         if event.button()!=Qt.MouseButton.LeftButton: return
         if self.ignore_release:
             self.ignore_release=False; self.drag_offset=None; return
@@ -416,20 +436,19 @@ class Pet(PetRenderer,QWidget):
             for label,state in [('摸摸头','pet'),('递一杯奶茶','feed')]:
                 action=menu.addAction(label,lambda checked=False,state=state:self.react(state)); action.setEnabled(not self.locked)
         menu.addAction('设置…',self.open_preferences)
-        for label,key in [('安静陪伴（静音）','audio_muted'),('锁定桌宠','interaction_locked')]:
+        for label,key in [('安静陪伴（静音）','audio_muted')]:
             action=menu.addAction(label); action.setCheckable(True); action.setChecked(self.options[key])
             action.triggered.connect(lambda checked,key=key:self.set_option(key,checked))
         def refresh():
             for action in menu.actions():
                 if action.text()=='安静陪伴（静音）': action.setChecked(self.options['audio_muted'])
-                elif action.text()=='锁定桌宠': action.setChecked(self.locked)
                 elif action.text() in ('摸摸头','递一杯奶茶'): action.setEnabled(not self.locked)
         menu.aboutToShow.connect(refresh)
         menu.addSeparator()
-        menu.addAction('刷新余额',self.refresh_quota); menu.addAction('打开 DeepSeek Harness',self.open_deepseek)
+        menu.addAction('刷新余额',self.refresh_quota)
         menu.addSeparator()
         if not tray: menu.addAction('暂时收起（托盘恢复）',self.hide)
-        menu.addAction('退出守岸人',self.shutdown); return menu
+        menu.addAction('关闭守岸人',self.shutdown); return menu
 
     def contextMenuEvent(self,event):
         menu=self.context_menu(); menu.exec(event.globalPos()); menu.deleteLater()
@@ -520,6 +539,7 @@ class Pet(PetRenderer,QWidget):
         if self.binding_editor: self.binding_editor.load_selection()
     def cancel_pointer_interaction(self):
         self.hover_timer.stop(); self.click_timer.stop(); self.hovered=False
+        self.quota_press=None
         self.drag_offset=None; self.drag_origin=None; self.dragged=False; self.ignore_release=True
         self.quota_resize.finish(); self.bubble_window.edge_resize.finish(); self.unsetCursor(); self.bubble_window.unsetCursor()
         if self.controller.owner=='interaction': self.clear_override()

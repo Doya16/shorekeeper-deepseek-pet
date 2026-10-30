@@ -47,7 +47,7 @@ class SettingsControlsTests(unittest.TestCase):
             labels=[a.text() for a in menu.actions()]
             self.assertEqual(labels.count('设置…'),1)
             self.assertFalse(any(s in labels for s in ('调整大小…','交互工作室','外观、声音与迁移','检查更新…','陪伴面板')))
-            self.assertIn('安静陪伴（静音）',labels);self.assertIn('锁定桌宠',labels)
+            self.assertIn('安静陪伴（静音）',labels);self.assertNotIn('锁定桌宠',labels);self.assertIn('关闭守岸人',labels);self.assertNotIn('退出守岸人',labels);self.assertFalse(any('回到当前' in x or x=='打开 DeepSeek Harness' for x in labels))
         p.open_bindings();window=p.preferences
         self.assertIs(p.binding_editor.window(),window);self.assertFalse(p.binding_editor.isWindow())
         self.assertEqual(window.tabs.currentWidget(),p.binding_editor)
@@ -58,8 +58,7 @@ class SettingsControlsTests(unittest.TestCase):
             check.assert_called_once_with(True)
         window.controls['interaction_locked'].setChecked(True)
         p.tray.contextMenu().aboutToShow.emit()
-        action=next(a for a in p.tray.contextMenu().actions() if a.text()=='锁定桌宠')
-        self.assertTrue(action.isChecked());action.trigger()
+        self.assertTrue(p.lock_button.isChecked());p.lock_button.click()
         self.assertFalse(p.locked);self.assertFalse(window.controls['interaction_locked'].isChecked())
 
     def test_mute_cancels_current_delay_queue_and_late_decode_without_losing_volume(self):
@@ -97,7 +96,7 @@ class SettingsControlsTests(unittest.TestCase):
         self.assertIsNone(p.drag_offset);self.assertFalse(p.click_timer.isActive())
         p.on_status({'state':'writing','thread_id':'test','turn_id':'turn','message':'示例编辑','active':True,'events':[]});self.assertEqual(p.state,'writing')
         p.on_status({'state':'writing','thread_id':'test','turn_id':'turn','active':True,'events':[{'state':'done','thread_id':'other','turn_id':'other','message':'示例完成'}]});self.assertEqual(p.state,'done')
-        action=next(a for a in p.context_menu().actions() if a.text()=='锁定桌宠');action.trigger();self.assertFalse(p.locked)
+        p.lock_button.click();self.assertFalse(p.locked)
         p.react('pet');self.assertEqual(p.state,'pet')
 
     def test_import_restart_and_repeat_export_preserve_options_and_all_media(self):
@@ -174,6 +173,78 @@ class SettingsControlsTests(unittest.TestCase):
             p.set_option('lock_button_size',150);self.assertAlmostEqual(b.width(),small*2,delta=1)
             one=b.width();p.set_scale(1.5);self.assertAlmostEqual(b.width(),one*1.5,delta=1)
             self.assertAlmostEqual(b.x()+b.width()/2,p.pet_rect.center().x()*p.scale_factor,delta=1)
+
+    def test_quota_click_refreshes_when_unlocked_or_locked_without_character_reaction(self):
+        p=self.pet
+        with patch.object(p,'refresh_quota') as refresh:
+            for locked in (False,True):
+                p.set_option('interaction_locked',locked)
+                point=p.quota_hit_rect().center();serial=p.controller.serial
+                self.mouse(p,QEvent.Type.MouseButtonPress,point)
+                self.mouse(p,QEvent.Type.MouseButtonRelease,point)
+                self.assertEqual(p.controller.serial,serial)
+                self.assertFalse(p.click_timer.isActive())
+            self.assertEqual(refresh.call_count,2)
+
+    def test_quota_resize_drag_out_and_drag_back_never_refresh(self):
+        p=self.pet
+        with patch.object(p,'refresh_quota') as refresh:
+            rect=p.quota_hit_rect();edge=QPointF(rect.right(),rect.center().y())
+            self.mouse(p,QEvent.Type.MouseButtonPress,edge)
+            self.mouse(p,QEvent.Type.MouseMove,edge+QPointF(35,0))
+            self.mouse(p,QEvent.Type.MouseButtonRelease,edge+QPointF(35,0))
+            self.assertNotEqual(p.options['quota_scale'],1)
+            for locked in (False,True):
+                p.set_option('interaction_locked',locked)
+                point=p.quota_hit_rect().center()
+                self.mouse(p,QEvent.Type.MouseButtonPress,point)
+                self.mouse(p,QEvent.Type.MouseMove,point+QPointF(80,80))
+                self.mouse(p,QEvent.Type.MouseMove,point)
+                self.mouse(p,QEvent.Type.MouseButtonRelease,point)
+                self.mouse(p,QEvent.Type.MouseButtonPress,point)
+                self.mouse(p,QEvent.Type.MouseButtonRelease,point+QPointF(0,-80))
+            refresh.assert_not_called()
+
+    def test_locked_hover_fades_only_avatar_and_retains_control_targets(self):
+        p=self.pet;p.transition_old=None;p.set_option('interaction_locked',True)
+        with patch('shorekeeper_pet.pointer_mode.QCursor.pos') as cursor:
+            cursor.return_value=p.mapToGlobal(QPoint(-40,-40))
+            p.lock_button.refresh_visibility();p.pointer_mode.refresh();solid=p.grab().toImage()
+            self.assertEqual(p.pointer_mode.avatar_opacity,1);self.assertTrue(p.pointer_mode.passthrough)
+            cursor.return_value=p.mapToGlobal((p.pet_rect.center()*p.scale_factor).toPoint())
+            p.lock_button.refresh_visibility();p.pointer_mode.refresh();faint=p.grab().toImage()
+            self.assertAlmostEqual(p.pointer_mode.avatar_opacity,.3);self.assertTrue(p.pointer_mode.passthrough)
+            # Alpha is reduced in the character, without fading the balance box.
+            def alpha(image,rect):
+                ratio=image.devicePixelRatio();r=rect.toAlignedRect()
+                return sum(image.pixelColor(round(x*ratio),round(y*ratio)).alpha() for y in range(r.top(),r.bottom()) for x in range(r.left(),r.right()))
+            body=p.quota_hit_rect().translated(0,-p.pet_rect.height()*p.scale_factor/2)
+            self.assertGreater(alpha(solid,body),alpha(faint,body)*2)
+            self.assertEqual(alpha(solid,p.quota_hit_rect()),alpha(faint,p.quota_hit_rect()))
+            for point in (p.lock_button.geometry().center(),p.quota_hit_rect().center().toPoint()):
+                cursor.return_value=p.mapToGlobal(point);p.pointer_mode.refresh();self.assertFalse(p.pointer_mode.passthrough)
+            p.set_option('interaction_locked',False);p.pointer_mode.refresh()
+            self.assertEqual(p.pointer_mode.avatar_opacity,1);self.assertFalse(p.pointer_mode.passthrough)
+
+    def test_hover_transparency_setting_saved_and_exported_without_media_changes(self):
+        p=self.pet;p.open_preferences('桌面与声音');p.preferences.controls['locked_hover_transparency'].setValue(85)
+        cfg=module.load_settings();self.assertEqual(cfg['appearance']['locked_hover_transparency'],85)
+        archive=self.root.parent/'faded.zip';self.assertEqual(export_bundle(archive,cfg,self.root),[])
+        restored=import_bundle(archive,self.root.parent/'另一台电脑')
+        self.assertEqual(restored['appearance']['locked_hover_transparency'],85)
+        self.assertEqual(restored['bindings'],cfg['bindings'])
+        from shorekeeper_pet.appearance import appearance
+        self.assertEqual(appearance({})['locked_hover_transparency'],70)
+        self.assertEqual(appearance({'appearance':{'locked_hover_transparency':float('nan')}})['locked_hover_transparency'],70)
+        self.assertEqual(appearance({'appearance':{'locked_hover_transparency':120}})['locked_hover_transparency'],95)
+
+    def test_tooltip_is_refreshed_when_displayed(self):
+        p=self.pet
+        from PySide6.QtGui import QHelpEvent
+        point=p.quota_hit_rect().center().toPoint()
+        with patch.object(p,'quota_details',return_value='下次刷新：2026/11/02 22:35（1小时2分钟后）'):
+            QApplication.sendEvent(p,QHelpEvent(QEvent.Type.ToolTip,point,p.mapToGlobal(point)))
+        self.assertIn('1小时2分钟后',p.toolTip())
 
     def test_legacy_quiet_migrates_and_explicit_new_preference_wins(self):
         self.assertTrue(migrate_settings({'quiet':True})['appearance']['audio_muted'])
