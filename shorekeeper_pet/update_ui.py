@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushBu
 
 from .appearance import stylesheet
 from .paths import VERSION, AUDIO_SESSION_NAME
-from .updates import check_latest, releases_url, UpdateResult
+from .updates import check_latest, releases_url, UpdateResult, source_url, SOURCE_LABELS
 
 
 class UpdateDialog(QDialog):
@@ -32,6 +32,7 @@ class UpdateDialog(QDialog):
                           ('  →  新版 v' + result.version if result.status == 'available' else ''))
         versions.setWordWrap(True)
         layout.addWidget(versions)
+        source=QLabel('本次使用：'+SOURCE_LABELS[result.source]);layout.addWidget(source)
         if result.status == 'available':
             tip = QLabel('更新前可先备份配置与素材。下载时请确认补丁适用于当前版本；'
                          '退出桌宠后，将程序补丁解压到原目录并覆盖同名文件。\n'
@@ -46,6 +47,14 @@ class UpdateDialog(QDialog):
             message = QLabel(result.message)
             message.setWordWrap(True)
             layout.addWidget(message)
+        if result.assets:
+            downloads=QHBoxLayout()
+            for asset in result.assets:
+                button=QPushButton(asset.label)
+                button.setToolTip(asset.name+('\nSHA256: '+asset.sha256 if asset.sha256 else ''))
+                button.clicked.connect(lambda checked=False,item=asset:self.open_download(item))
+                downloads.addWidget(button)
+            layout.addLayout(downloads)
         self.browser_status = QLabel()
         self.browser_status.setWordWrap(True)
         layout.addWidget(self.browser_status)
@@ -70,8 +79,18 @@ class UpdateDialog(QDialog):
         dismiss.addWidget(close)
         layout.addLayout(dismiss)
 
+    def effective_source(self):
+        choice=self.controller.pet.options['update_source']
+        return self.result.source if choice=='auto' else choice
+
+    def open_download(self,asset):
+        if not QDesktopServices.openUrl(QUrl(source_url(asset.url,self.effective_source()))):
+            self.browser_status.setText('无法打开浏览器，请稍后重试。')
+
     def open_release(self):
-        if not QDesktopServices.openUrl(QUrl(self.result.url or releases_url())):
+        source=self.effective_source()
+        url=releases_url().removesuffix('/latest') if source=='mirror' else self.result.url or releases_url()
+        if not QDesktopServices.openUrl(QUrl(source_url(url,source))):
             self.browser_status.setText('无法打开浏览器，请稍后重试。')
 
     def ignore(self):
@@ -95,7 +114,7 @@ class UpdateController(QObject):
         self.manual_requested = False
         self.dialog = None
         self.status = '尚未检查更新'
-        self.finished.connect(self._finished)
+        self.finished.connect(self._received)
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.check_startup)
@@ -120,19 +139,29 @@ class UpdateController(QObject):
             return
         self.busy = True
         self.busy_changed.emit(True)
-        self._status('正在检查 GitHub 更新…')
+        choice=self.pet.options['update_source']
+        self._status('正在检查更新 · '+SOURCE_LABELS[choice]+'…')
 
         def work():
             try:
-                result = check_latest()
+                result = check_latest(source=choice)
             except Exception:
                 result = UpdateResult('unavailable', url=releases_url(),
                                       message='本次未能检查更新，请稍后重试。')
             try:
-                self.finished.emit(result)
+                self.finished.emit((choice,result))
             except RuntimeError:
                 pass  # The app has already closed; the worker owns no files.
         threading.Thread(target=work, daemon=True, name='release-check').start()
+
+    @Slot(object)
+    def _received(self,payload):
+        choice,result=payload
+        if self.closed:return
+        if choice!=self.pet.options['update_source']:
+            self.busy=False;self.busy_changed.emit(False);self.manual_requested=False
+            self._status('来源已更换，请点击立即检查更新。');return
+        self._finished(result)
 
     @Slot(object)
     def _finished(self, result):
@@ -144,7 +173,7 @@ class UpdateController(QObject):
         self.manual_requested = False
         message = ('发现新版 v' + result.version if result.status == 'available'
                    else '已是最新版本' if result.status == 'current' else result.message)
-        self._status(datetime.now().strftime('%H:%M') + ' · ' + message)
+        self._status(datetime.now().strftime('%H:%M') + ' · ' + SOURCE_LABELS[result.source] + ' · ' + message)
         if not manual and (result.status != 'available' or
                            not self.pet.options['check_updates_on_start'] or
                            self.pet.options['ignored_update_version'] == result.version):

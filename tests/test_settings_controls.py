@@ -263,6 +263,16 @@ class SettingsControlsTests(unittest.TestCase):
         self.assertEqual(p.tray.icon().pixmap(32,32).toImage(),clean)
         self.assertIn('创建桌面快捷方式',[b.text() for b in p.preferences.buttons])
 
+    def test_lifecycle_setting_and_selected_update_route(self):
+        p=self.pet;key='exit_with_deepseek' if 'deepseek' in module.__file__ else 'exit_with_codex'
+        p.open_preferences();p.preferences.controls[key].setChecked(False)
+        with patch.object(p,'shutdown') as shutdown:
+            p.offline=False;p.on_client_exit();shutdown.assert_not_called()
+            p.preferences.controls[key].setChecked(True);p.on_client_exit();shutdown.assert_called_once()
+            p.offline=True;p.on_client_exit();self.assertEqual(shutdown.call_count,1)
+        p.preferences.controls['update_source'].setCurrentIndex(p.preferences.controls['update_source'].findData('mirror'))
+        self.assertEqual(module.load_settings()['appearance']['update_source'],'mirror')
+
     def test_legacy_quiet_migrates_and_explicit_new_preference_wins(self):
         self.assertTrue(migrate_settings({'quiet':True})['appearance']['audio_muted'])
         self.assertFalse(migrate_settings({'quiet':True,'appearance':{'audio_muted':False}})['appearance']['audio_muted'])

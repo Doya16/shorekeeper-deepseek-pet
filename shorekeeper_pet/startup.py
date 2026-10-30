@@ -37,35 +37,15 @@ def configure(enabled,root=ROOT):
 def is_deepseek_desktop(path):
     return pathlib.PureWindowsPath(str(path)).name.lower()=='deepseek harness.exe'
 
+def deepseek_process_tree():
+    from .process_scan import process_tree
+    return process_tree(('deepseek harness.exe',),is_deepseek_desktop)
+
 def deepseek_processes():
-    if sys.platform!='win32':return set()
-    class Entry(ctypes.Structure):
-        _fields_=[('size',wintypes.DWORD),('usage',wintypes.DWORD),('pid',wintypes.DWORD),
-                  ('heap',ctypes.c_size_t),('module',wintypes.DWORD),('threads',wintypes.DWORD),
-                  ('parent',wintypes.DWORD),('priority',wintypes.LONG),('flags',wintypes.DWORD),('exe',wintypes.WCHAR*260)]
-    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
-    kernel.CreateToolhelp32Snapshot.argtypes=[wintypes.DWORD,wintypes.DWORD];kernel.CreateToolhelp32Snapshot.restype=wintypes.HANDLE
-    kernel.Process32FirstW.argtypes=[wintypes.HANDLE,ctypes.POINTER(Entry)]
-    kernel.Process32NextW.argtypes=[wintypes.HANDLE,ctypes.POINTER(Entry)]
-    kernel.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD];kernel.OpenProcess.restype=wintypes.HANDLE
-    kernel.QueryFullProcessImageNameW.argtypes=[wintypes.HANDLE,wintypes.DWORD,wintypes.LPWSTR,ctypes.POINTER(wintypes.DWORD)]
-    kernel.CloseHandle.argtypes=[wintypes.HANDLE]
-    snapshot=kernel.CreateToolhelp32Snapshot(2,0)
-    if snapshot==ctypes.c_void_p(-1).value:raise ctypes.WinError(ctypes.get_last_error())
-    found=set()
-    try:
-        entry=Entry();entry.size=ctypes.sizeof(entry);ok=kernel.Process32FirstW(snapshot,ctypes.byref(entry))
-        while ok:
-            if entry.exe.lower() == 'deepseek harness.exe':
-                process=kernel.OpenProcess(0x1000,False,entry.pid)
-                if process:
-                    try:
-                        path=ctypes.create_unicode_buffer(32768);size=wintypes.DWORD(len(path))
-                        if kernel.QueryFullProcessImageNameW(process,0,path,ctypes.byref(size)) and is_deepseek_desktop(path.value):found.add(entry.pid)
-                    finally:kernel.CloseHandle(process)
-            ok=kernel.Process32NextW(snapshot,ctypes.byref(entry))
-    finally:kernel.CloseHandle(snapshot)
-    return found
+    return desktop_roots(deepseek_process_tree())
+
+def desktop_roots(parents):
+    return {pid for pid,parent in parents.items() if parent not in parents}
 
 class LaunchEdges:
     """One launch per desktop run, including a restart between two polls."""

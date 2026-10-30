@@ -23,7 +23,7 @@ Recorded with **v0.1.0**, the roughly two-minute demo covers task states, concur
 ## Get started
 
 1. Install the Windows client from the [official DeepSeek Harness website](https://www.deepseek.com/harness/), open it, and sign in.
-2. Download [Shorekeeper-DeepSeek-Windows-v0.4.0.zip](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Windows-v0.4.0.zip), extract it completely, and run **守岸人DeepSeek桌宠启动.exe**.
+2. Download [Shorekeeper-DeepSeek-Windows-v0.5.0.zip](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.0/Shorekeeper-DeepSeek-Windows-v0.5.0.zip), extract it completely, and run **守岸人DeepSeek桌宠启动.exe**.
 3. Fully quit Harness from its tray menu. Right-click the pet → **设置 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件** (Settings → Connect to DeepSeek → Install / Update Harness Connection Plugin).
 4. Reopen Harness and start a task. The pet follows the most recently active conversation.
 
@@ -52,11 +52,21 @@ Right-click the pet or tray icon → **设置…** (Settings). One window contai
 
 ![Unified desktop and sound settings](docs/demo/unified-settings.png)
 
+## Follow client exit
+
+Under **设置 → 连接 DeepSeek**, startup and shutdown follow are separate options. **随 DeepSeek 完全退出而关闭** is enabled by default: the pet closes about 8–10 seconds after the last client instance fully exits. A client still running in the tray keeps the pet open. Brief restarts are tolerated; launching the pet before the client does not immediately close it.
+
+![连接与退出联动](docs/demo/connection-settings.png)
+
 ## Checking for updates and keeping your settings
 
-Current version: **v0.4.0**. After each launch, the pet checks GitHub for a stable release and prompts you when a newer one is available. Right-click → **设置 → 版本与更新 → 立即检查更新** (Check for updates) to check manually.
+Current version: **v0.5.0**. After each launch, the pet checks for a stable release and prompts you when a newer one is available. Right-click → **设置 → 版本与更新 → 立即检查更新** (Check for updates) to check manually.
 
 Open **设置 → 版本与更新** (Settings → Version & Updates) to disable startup checks, check immediately, or restore ignored version reminders. A new-version prompt lets you open the release page, back up settings and media, remind you later, or ignore that version. A failed background check does not interrupt the pet.
+
+Choose **自动选择** (automatic), **GitHub 官方源** (direct), or **镜像加速（中国大陆网络）** (mirror) under Version & Updates. Automatic mode tries GitHub first and falls back when it cannot connect. A fixed choice never silently switches. The update window shows the route and offers download links for the complete package, program patch and checksums.
+
+The third-party [GH-Proxy](https://gh-proxy.com/docs/github-accelerator) mirror handles only public release metadata and downloads; it may lag behind GitHub. Source and exit preferences travel with exported settings.
 
 ![Version and update settings](docs/demo/update-settings.png)
 
@@ -64,8 +74,8 @@ Open **设置 → 版本与更新** (Settings → Version & Updates) to disable 
 
 | Your installation | How to update |
 | --- | --- |
-| v0.3.0 | Download the [v0.4.0 program patch](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Settings-Patch-v0.4.0.zip), exit the pet, extract over its existing folder, and restart |
-| New installation or another older version | Extract the [v0.4.0 full package](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.4.0/Shorekeeper-DeepSeek-Windows-v0.4.0.zip) into a new folder, then import your exported settings and assets ZIP if you have one |
+| v0.4.0 | Download the [v0.5.0 program patch](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.0/Shorekeeper-DeepSeek-Settings-Patch-v0.5.0.zip), exit the pet, extract over its existing folder, and restart |
+| New installation or another older version | Extract the [v0.5.0 full package](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.0/Shorekeeper-DeepSeek-Windows-v0.5.0.zip) into a new folder, then import your exported settings and assets ZIP if you have one |
 
 The program patch preserves **GIFs / images, audio, bubble captions, fonts, and personal settings**. Before updating, use **保存与迁移 → 导出配置与素材包（ZIP）** (Save & Migrate → Export Settings & Assets ZIP) to keep a backup. Extract program patches into the application folder; do not import them as settings.
 

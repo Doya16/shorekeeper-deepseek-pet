@@ -491,7 +491,9 @@
     "lock_button_transparency": 35,
     "lock_button_size": 100,
     "locked_hover_transparency": 70,
-    "tray_icon_style": "badged"
+    "tray_icon_style": "badged",
+    "exit_with_deepseek": true,
+    "update_source": "auto"
   },
   "pack": "163",
   "thread": "auto",

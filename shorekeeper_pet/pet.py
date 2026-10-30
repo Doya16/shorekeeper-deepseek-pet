@@ -89,6 +89,7 @@ class Animation:
         return self.frames[seq[-1]]
 
 class BridgeWorker(QObject):
+    client_exited=Signal()
     status=Signal(dict)
     quota=Signal(dict)
     threads=Signal(list)
@@ -125,6 +126,9 @@ class Pet(PetRenderer,QWidget):
         self.quota_data={}; self.thread_list=[]; self.panel=None; self.binding_editor=None
         self.monitor=Monitor(self.options['deepseek_home'] or DSH_HOME); self.monitor.selected=self.settings.get('thread','auto')
         self.rate_client=RateClient(self.options['deepseek_executable'],self.options['deepseek_home']); self.worker=BridgeWorker(); self.stop_event=threading.Event(); self.refresh_event=threading.Event()
+        from .client_lifetime import ClientLifetime
+        self.client_lifetime=ClientLifetime()
+        self.worker.client_exited.connect(self.on_client_exit)
         self.voice=VoicePlayer(ROOT,self); self.preview_audio_clip=None
         self.bubble_window=SpeechBubble(self); self.voice.changed.connect(self.on_voice_changed)
         self.worker.status.connect(self.on_status); self.worker.quota.connect(self.on_quota); self.worker.threads.connect(self.on_threads)
@@ -204,8 +208,20 @@ class Pet(PetRenderer,QWidget):
         if state==self.state: self.controller.enter(state,time.monotonic(),self.controller.owner)
         self.update_layout(); self.tick(); return ok
 
+    def on_client_exit(self):
+        if not self.offline and self.options['exit_with_deepseek']:self.shutdown()
+
     def watch_status(self):
+        from .startup import deepseek_process_tree
+        next_client_check=0
         while not self.stop_event.is_set():
+            now=time.monotonic()
+            if now>=next_client_check:
+                next_client_check=now+2
+                enabled=self.options['exit_with_deepseek']
+                try:parents=deepseek_process_tree() if enabled else {}
+                except OSError:parents=None
+                if self.client_lifetime.observe(parents,now,enabled):self.worker.client_exited.emit()
             try:
                 target=pathlib.Path(self.options['deepseek_home'] or DSH_HOME)
                 if self.monitor.home!=target:
@@ -609,7 +625,7 @@ class Pet(PetRenderer,QWidget):
     def write_health(self):
         data=dict(version=VERSION,pid=os.getpid(),updated_at=time.time(),state=self.state,visible=self.isVisible(),quota_source=self.quota_data.get('source'),quota_updated_at=self.quota_data.get('updated_at'),quota_available=bool(self.quota_data.get('wallets')),rate_error=self.quota_data.get('error'),thread_count=len(self.thread_list),animation=self.animation_id,custom_bindings=len(self.bindings.overrides),font=self.options['bubble_font_family'])
         data.update(audio_muted=self.options['audio_muted'],interaction_locked=self.locked)
-        data.update(update_status=self.updates.status,update_check_pending=self.updates.busy)
+        data.update(update_status=self.updates.status,update_check_pending=self.updates.busy,client_seen=self.client_lifetime.seen,client_exit_pending=self.client_lifetime.missing_since is not None)
         data.update(follow=self.monitor.selected,thread_id=self.live_status.get('thread_id'),live_state=self.live_status.get('state'),owner=self.controller.owner,scale=self.requested_scale,display_scale=self.scale_factor,window_size=[self.width(),self.height()])
         try:
             (ROOT/'runtime.json').write_text(json.dumps(data,ensure_ascii=False,indent=2),encoding='utf-8')
@@ -619,8 +635,8 @@ def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--preview',action='store_true'); parser.add_argument('--smoke-test',action='store_true'); parser.add_argument('--capture-after',type=int,default=0); parser.add_argument('--bindings',action='store_true'); parser.add_argument('--settings',action='store_true'); parser.add_argument('--verify-package',action='store_true'); parser.add_argument('--verify-update-check',action='store_true'); parser.add_argument('--verify-connection',action='store_true'); args=parser.parse_args()
     if args.verify_update_check:
         from .updates import check_latest
-        result=check_latest()
-        report=dict(ok=result.status!='unavailable',status=result.status,latest=result.version,url=result.url,version=VERSION,frozen=bool(getattr(sys,'frozen',False)))
+        result=check_latest(source=appearance(load_settings())['update_source'])
+        report=dict(ok=result.status!='unavailable',status=result.status,source=result.source,latest=result.version,url=result.url,version=VERSION,frozen=bool(getattr(sys,'frozen',False)))
         (ROOT/'update-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
         return 0 if report['ok'] else 1
     if args.verify_connection:

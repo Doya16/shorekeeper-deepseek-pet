@@ -103,7 +103,7 @@ class UpdateWidgetTests(unittest.TestCase):
     def result(self):return updates.UpdateResult('available','9.9.9',updates.releases_url(),'说明')
     def test_startup_checks_once_in_worker_and_does_not_touch_settings(self):
         main=threading.get_ident();calls=[];before=copy.deepcopy(self.pet.settings)
-        def check():calls.append(threading.get_ident());return updates.UpdateResult('current')
+        def check(**kwargs):calls.append(threading.get_ident());return updates.UpdateResult('current')
         with patch.object(update_ui,'check_latest',side_effect=check):
             self.controller.check_startup();self.wait_for(lambda:not self.controller.busy)
             self.controller.check_startup()
@@ -135,9 +135,23 @@ class UpdateWidgetTests(unittest.TestCase):
         self.assertEqual(data['bindings'],before['bindings'])
     def test_shutdown_ignores_late_results(self):
         self.controller.close();self.controller._finished(self.result());self.assertIsNone(self.controller.dialog)
+    def test_changing_source_discards_the_inflight_result(self):
+        self.controller.busy=True;self.controller.manual_requested=True;self.pet.options['update_source']='mirror'
+        self.controller._received(('auto',self.result()))
+        self.assertIsNone(self.controller.dialog);self.assertFalse(self.controller.busy)
+        self.assertIn('来源已更换',self.controller.status)
+    def test_download_button_uses_user_selected_source(self):
+        from unittest.mock import patch
+        self.controller._finished(self.result());dialog=self.controller.dialog
+        asset=updates.ReleaseAsset('test.zip','下载','https://github.com/'+UPDATE_REPOSITORY+'/releases/download/v9.9.9/test.zip')
+        self.pet.options['update_source']='mirror'
+        with patch.object(update_ui.QDesktopServices,'openUrl',return_value=True) as open_url:
+            dialog.open_download(asset)
+            self.assertEqual(open_url.call_args.args[0].toString(),updates.MIRROR+asset.url)
+
     def test_manual_check_joins_inflight_request_and_plain_text_notes(self):
         ready=threading.Event();done=threading.Event()
-        def check():ready.set();done.wait(1);return updates.UpdateResult('available','9.9.9',notes='<script>alert(1)</script>')
+        def check(**kwargs):ready.set();done.wait(1);return updates.UpdateResult('available','9.9.9',notes='<script>alert(1)</script>')
         with patch.object(update_ui,'check_latest',side_effect=check) as request:
             self.controller.check(False);self.assertTrue(ready.wait(1));self.controller.check(True)
             done.set();self.wait_for(lambda:not self.controller.busy)

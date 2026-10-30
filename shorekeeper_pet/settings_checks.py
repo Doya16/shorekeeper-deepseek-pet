@@ -69,6 +69,49 @@ def verify_controls(pet):
                 link.unlink()
                 shortcut_check=shortcut_check and ensure_first_launch_shortcut(ROOT,frozen=True,destination=desktop,state_root=state) is None and not link.exists()
                 shortcut_check=shortcut_check and create_desktop_shortcut(ROOT,desktop,state_root=state).is_file()
-        return dict(icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
+        from .client_lifetime import ClientLifetime
+        from .process_scan import process_tree
+        import subprocess,os,time
+        probe=pathlib.Path(os.environ.get('SystemRoot','C:/Windows'))/'System32/ping.exe'
+        # A private native child exercises process start/exit without closing
+        # the user's real client or interrupting its active conversations.
+        child=subprocess.Popen([str(probe),'-t','127.0.0.1'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            tree=process_tree(('ping.exe',),lambda path:pathlib.Path(path)==probe)
+            tree={pid:parent for pid,parent in tree.items() if pid==child.pid}
+            guard=ClientLifetime();lifecycle_check=child.pid in tree and not guard.observe(tree,0) and not guard.observe(tree,20)
+            child.terminate();child.wait(timeout=5)
+            tree=process_tree(('ping.exe',),lambda path:pathlib.Path(path)==probe)
+            tree={pid:parent for pid,parent in tree.items() if pid==child.pid}
+            lifecycle_check=lifecycle_check and not tree and not guard.observe(tree,22) and guard.observe(tree,30)
+        finally:
+            if child.poll() is None:child.terminate();child.wait(timeout=5)
+        exit_key=next(key for key in ('exit_with_codex','exit_with_deepseek') if key in pet.options)
+        # Deliver the same Qt signal as the worker. Capture shutdown here so
+        # the remainder of this independent package verification can finish.
+        original_shutdown=pet.shutdown;original_offline=pet.offline;called=[]
+        try:
+            pet.shutdown=lambda:called.append(True);pet.offline=False
+            pet.options[exit_key]=False;pet.worker.client_exited.emit();lifecycle_check=lifecycle_check and not called
+            pet.options[exit_key]=True;pet.worker.client_exited.emit();lifecycle_check=lifecycle_check and called==[True]
+        finally:pet.shutdown=original_shutdown;pet.offline=original_offline
+        from .updates import check_latest,ReleaseAsset,source_url,MIRROR
+        from .paths import UPDATE_REPOSITORY
+        import json
+        class Response:
+            def __enter__(self):return self
+            def __exit__(self,*args):pass
+            def read(self,n):return json.dumps(dict(tag_name='v9.9.9',draft=False,prerelease=False,body='test')).encode()
+        requests=[]
+        def read(request,timeout):
+            requests.append(request.full_url)
+            if len(requests)==1:raise TimeoutError()
+            return Response()
+        result=check_latest(opener=read)
+        source_check=result.status=='available' and result.source=='mirror' and len(requests)==2
+        control=pet.preferences.controls['update_source']
+        control.setCurrentIndex(control.findData('mirror'))
+        source_check=source_check and pet.options['update_source']=='mirror' and exit_key in pet.preferences.controls
+        return dict(client_lifecycle_check=lifecycle_check,update_sources_check=source_check,icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
     finally:
         pet.voice.stop();pet.options=original;pet.apply_icon();pet.save_settings();pet.update_layout();pet.preferences.refresh_controls()
