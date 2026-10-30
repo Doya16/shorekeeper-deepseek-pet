@@ -174,6 +174,57 @@ class SettingsControlsTests(unittest.TestCase):
             one=b.width();p.set_scale(1.5);self.assertAlmostEqual(b.width(),one*1.5,delta=1)
             self.assertAlmostEqual(b.x()+b.width()/2,p.pet_rect.center().x()*p.scale_factor,delta=1)
 
+
+    def test_balance_cursor_is_hand_inside_and_resize_only_at_unlocked_edges(self):
+        p=self.pet
+        for locked in (False,True):
+            p.set_option('interaction_locked',locked)
+            rect=p.quota_hit_rect()
+            for point,shape in ((rect.center(),Qt.CursorShape.PointingHandCursor),
+                (QPointF(rect.right(),rect.center().y()),Qt.CursorShape.PointingHandCursor if locked else Qt.CursorShape.SizeHorCursor),
+                (p.pet_rect.center()*p.scale_factor,Qt.CursorShape.ArrowCursor)):
+                self.mouse(p,QEvent.Type.MouseMove,point,button=Qt.MouseButton.NoButton)
+                self.assertEqual(p.cursor().shape(),shape)
+                # Native click-through polling must keep the same cursor.
+                with patch('shorekeeper_pet.pointer_mode.QCursor.pos',return_value=p.mapToGlobal(point.toPoint())):
+                    p.pointer_mode.refresh();self.assertEqual(p.cursor().shape(),shape)
+
+    def test_inline_refresh_waits_for_its_own_response_and_never_changes_voice_or_bubbles(self):
+        p=self.pet;clock=[10.];p.quota_refresh.clock=lambda:clock[0]
+        initial=dict(source='live',updated_at=10,windows=[],wallets=[dict(currency='CNY',balance='3.14')])
+        p.on_quota(initial);rect=p.quota_hit_rect();serial=p.controller.serial;until=p.bubble_until
+        original_text=p.bubble_text();old=p.quota_refresh.begin_read()
+        with patch.object(p.voice,'trigger') as voice:
+            self.mouse(p,QEvent.Type.MouseButtonPress,rect.center())
+            self.mouse(p,QEvent.Type.MouseButtonRelease,rect.center())
+            self.assertEqual(p.quota_display_label(),'刷新中…');self.assertEqual(rect,p.quota_hit_rect())
+            p.refresh_quota();self.assertEqual(p.quota_refresh.sequence,1)
+            p.on_quota(dict(initial,updated_at=11));self.assertEqual(p.quota_display_label(),'刷新中…')
+            p.worker.quota_read.emit(old,dict(initial,updated_at=12));self.assertEqual(p.quota_display_label(),'刷新中…')
+            ticket=p.quota_refresh.begin_read();clock[0]+=1
+            p.worker.quota_read.emit(ticket,dict(initial,updated_at=13))
+            self.assertEqual(p.quota_display_label(),p.quota_label(compact=True))
+            self.assertEqual(p.quota_data['updated_at'],13)
+            self.assertEqual((serial,until,original_text),(p.controller.serial,p.bubble_until,p.bubble_text()))
+            voice.assert_not_called()
+
+    def test_confirmed_sign_out_clears_the_previous_account_balance(self):
+        p=self.pet
+        p.on_quota(dict(source='live',updated_at=10,windows=[],wallets=[dict(currency='CNY',balance='3.14')]))
+        p.on_quota(dict(source='live',updated_at=11,windows=[],wallets=[],status='signed-out',error='请登录'))
+        self.assertEqual(p.quota_data['wallets'],[])
+
+    def test_refresh_failure_keeps_previous_balance_and_feedback_is_not_saved(self):
+        p=self.pet;clock=[10.];p.quota_refresh.clock=lambda:clock[0]
+        p.on_quota(dict(source='live',updated_at=10,windows=[],wallets=[dict(currency='CNY',balance='3.14')]))
+        p.refresh_quota();ticket=p.quota_refresh.begin_read();clock[0]+=1
+        p.worker.quota_read.emit(ticket,dict(windows=[],wallets=[],error='failed',source='unavailable'))
+        self.assertEqual(p.quota_display_label(),'刷新失败')
+        self.assertEqual(p.quota_data['wallets'][0]['balance'],'3.14')
+        p.save_settings();saved=module.SETTINGS.read_text('utf8')
+        self.assertNotIn('quota_refresh',saved);self.assertNotIn('刷新失败',saved)
+        clock[0]+=2.6;self.assertEqual(p.quota_display_label(),p.quota_label(compact=True))
+
     def test_quota_click_refreshes_when_unlocked_or_locked_without_character_reaction(self):
         p=self.pet
         with patch.object(p,'refresh_quota') as refresh:

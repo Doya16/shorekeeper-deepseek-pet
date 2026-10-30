@@ -32,6 +32,7 @@ class PointerMode:
         p=self.pet
         if not hasattr(p,'pet_rect'): return
         local=p.mapFromGlobal(QCursor.pos())
+        p.update_quota_cursor(local)
         over=p.pet_rect.contains(local/p.scale_factor)
         self.avatar_opacity=1-p.options['locked_hover_transparency']/100 if p.locked and over else 1.0
         # The lock and quota remain usable. Preserve a control's mouse grab while

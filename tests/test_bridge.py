@@ -55,6 +55,30 @@ class BridgeTests(unittest.TestCase):
         self.data['balance'].update(wallets=[dict(currency='CNY',balance='0E-16')],bonus=[dict(currency='USD',balance='5')])
         with patch('shorekeeper_pet.bridge.time.time',return_value=110):
             self.assertEqual(balance_label(balance_data(self.data),True),'算力余额：$5.00')
+    def test_balance_refresh_waits_for_balance_not_snapshot_heartbeat(self):
+        old=dict(self.data,updated_at=time.time(),balance=dict(self.data['balance'],updated_at=time.time()-20))
+        fresh=dict(old,updated_at=time.time(),balance=dict(old['balance'],updated_at=time.time()+.1, wallets=[dict(currency='CNY',balance='2')]))
+        client=RateClient(deepseek_home=str(self.home))
+        with patch('shorekeeper_pet.bridge.read_snapshot',side_effect=[old,old,dict(old,updated_at=time.time()+1),fresh]) as read:
+            result=client.read(timeout=1)
+        self.assertEqual(read.call_count,4);self.assertEqual(result['wallets'][0]['balance'],'2')
+        self.assertEqual(result['source'],'live');self.assertFalse(result['error'])
+
+    def test_balance_refresh_timeout_does_not_report_cached_success(self):
+        old=dict(self.data,updated_at=time.time(),balance=dict(self.data['balance'],updated_at=time.time()-20))
+        with patch('shorekeeper_pet.bridge.read_snapshot',return_value=old):
+            result=RateClient(deepseek_home=str(self.home)).read(timeout=.01)
+        self.assertTrue(result['error']);self.assertEqual(result['source'],'cache')
+
+    def test_close_interrupts_wait_for_plugin_response(self):
+        import threading
+        old=dict(self.data,updated_at=time.time(),balance=dict(self.data['balance'],updated_at=time.time()-20))
+        client=RateClient(deepseek_home=str(self.home));result=[]
+        with patch('shorekeeper_pet.bridge.read_snapshot',return_value=old):
+            worker=threading.Thread(target=lambda:result.append(client.read()));worker.start()
+            time.sleep(.05);client.close();worker.join(1)
+        self.assertFalse(worker.is_alive());self.assertTrue(result[0]['error'])
+
     def test_balance_refresh_only_touches_plugin_request_file(self):
         self.poll()
         RateClient(deepseek_home=str(self.home)).read()

@@ -123,6 +123,6 @@ class PetRenderer:
             remaining=100
             p.setBrush(QColor(fill)); p.drawRoundedRect(QRectF(track.left(),track.top(),track.width()*max(0,min(100,remaining))/100,track.height()),2,2)
         p.setFont(self.quota_font); p.setPen(QColor('#744d13' if low else '#204e7d'))
-        label=QFontMetrics(self.quota_font).elidedText(self.quota_label(compact=True),Qt.TextElideMode.ElideRight,round(bar.width()-18))
+        label=QFontMetrics(self.quota_font).elidedText(self.quota_display_label(),Qt.TextElideMode.ElideRight,round(bar.width()-18))
         p.drawText(QRectF(bar.left()+9,bar.top()+3,bar.width()-18,bar.height()-14),Qt.AlignmentFlag.AlignCenter,label)
         paint_grips(p,bar,self.scale_factor*quota_scale); p.restore(); p.end()

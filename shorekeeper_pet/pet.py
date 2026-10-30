@@ -92,6 +92,7 @@ class BridgeWorker(QObject):
     client_exited=Signal()
     status=Signal(dict)
     quota=Signal(dict)
+    quota_read=Signal(int,dict)
     threads=Signal(list)
 
 class Pet(PetRenderer,QWidget):
@@ -126,6 +127,9 @@ class Pet(PetRenderer,QWidget):
         self.quota_data={}; self.thread_list=[]; self.panel=None; self.binding_editor=None
         self.monitor=Monitor(self.options['deepseek_home'] or DSH_HOME); self.monitor.selected=self.settings.get('thread','auto')
         self.rate_client=RateClient(self.options['deepseek_executable'],self.options['deepseek_home']); self.worker=BridgeWorker(); self.stop_event=threading.Event(); self.refresh_event=threading.Event()
+        from .quota_refresh import QuotaRefresh
+        self.quota_refresh=QuotaRefresh(self.refresh_event)
+        self.worker.quota_read.connect(self.on_quota_read)
         from .client_lifetime import ClientLifetime
         self.client_lifetime=ClientLifetime()
         self.worker.client_exited.connect(self.on_client_exit)
@@ -235,18 +239,37 @@ class Pet(PetRenderer,QWidget):
 
     def watch_quota(self):
         while not self.stop_event.is_set():
-            self.refresh_event.clear()
+            ticket=self.quota_refresh.begin_read()
             try:
                 if (self.rate_client.executable,self.rate_client.deepseek_home)!=(self.options['deepseek_executable'],self.options['deepseek_home']):
                     self.rate_client.close(); self.rate_client=RateClient(self.options['deepseek_executable'],self.options['deepseek_home'])
-                self.worker.quota.emit(self.rate_client.read())
+                self.worker.quota_read.emit(ticket,self.rate_client.read())
             except Exception:
-                self.worker.quota.emit(dict(error='刷新暂时失败，显示最近记录。'))
+                self.worker.quota_read.emit(ticket,dict(error='刷新暂时失败，显示最近记录。'))
             self.refresh_event.wait(120)
 
     def refresh_quota(self):
-        self.refresh_event.set()
-        self.bubble_until=time.monotonic()+10
+        self.quota_refresh.request((self.options['deepseek_executable'],self.options['deepseek_home']))
+        self.update()
+
+    def quota_display_label(self):
+        return self.quota_refresh.label() or self.quota_label(compact=True)
+
+    def on_quota_read(self,ticket,result):
+        self.on_quota(result)
+        self.quota_refresh.finish(ticket,result)
+        self.update()
+
+    def update_quota_cursor(self,local=None):
+        from .presentation_size import edge_at
+        if not hasattr(self,'quota_rect'):return
+        if local is None:local=self.mapFromGlobal(QCursor.pos())
+        rect=self.quota_hit_rect()
+        if self.quota_resize.active or (not self.locked and edge_at(local,rect)):
+            shape=Qt.CursorShape.SizeHorCursor
+        elif rect.contains(local):shape=Qt.CursorShape.PointingHandCursor
+        else:shape=Qt.CursorShape.ArrowCursor
+        if self.cursor().shape()!=shape:self.setCursor(shape)
 
     def on_status(self, status):
         changed=status.get('state')!=self.live_status.get('state') or status.get('thread_id')!=self.live_status.get('thread_id')
@@ -273,7 +296,8 @@ class Pet(PetRenderer,QWidget):
     def on_quota(self, quota):
         # A slow cache read must never replace a newer live response.
         if quota.get('updated_at',0) and quota.get('updated_at',0)<self.quota_data.get('updated_at',0): return
-        if 'windows' in quota: self.quota_data=quota
+        if quota.get('error') and quota.get('status')!='signed-out' and self.quota_data: self.quota_data.update(error=quota['error'])
+        elif 'windows' in quota: self.quota_data=quota
         else: self.quota_data.update(quota)
         if self.panel: self.panel.refresh()
         self.update()
@@ -380,11 +404,13 @@ class Pet(PetRenderer,QWidget):
     def mouseMoveEvent(self, event):
         self.lock_button.refresh_visibility()
         self.pointer_mode.refresh()
+        self.update_quota_cursor(event.position())
         if self.quota_press is not None:
             if (event.globalPosition()-self.quota_press).manhattanLength()>QApplication.startDragDistance(): self.quota_click_cancelled=True
             event.accept(); return
         if self.locked: event.accept(); return
         if self.quota_resize.move(event,self.quota_hit_rect()): return
+        self.update_quota_cursor(event.position())
         if self.drag_offset is not None and event.buttons()&Qt.MouseButton.LeftButton:
             if (event.globalPosition().toPoint()-self.drag_origin).manhattanLength()>6:
                 if not self.dragged: self.react('drag')
@@ -427,6 +453,7 @@ class Pet(PetRenderer,QWidget):
 
     def enterEvent(self,event):
         self.lock_button.refresh_visibility()
+        self.update_quota_cursor()
         if not self.locked: self.hover_timer.start(1000)
         super().enterEvent(event)
 
@@ -624,7 +651,7 @@ class Pet(PetRenderer,QWidget):
 
     def write_health(self):
         data=dict(version=VERSION,pid=os.getpid(),updated_at=time.time(),state=self.state,visible=self.isVisible(),quota_source=self.quota_data.get('source'),quota_updated_at=self.quota_data.get('updated_at'),quota_available=bool(self.quota_data.get('wallets')),rate_error=self.quota_data.get('error'),thread_count=len(self.thread_list),animation=self.animation_id,custom_bindings=len(self.bindings.overrides),font=self.options['bubble_font_family'])
-        data.update(audio_muted=self.options['audio_muted'],interaction_locked=self.locked)
+        data.update(audio_muted=self.options['audio_muted'],interaction_locked=self.locked,quota_refresh_status=self.quota_refresh.label())
         data.update(update_status=self.updates.status,update_check_pending=self.updates.busy,client_seen=self.client_lifetime.seen,client_exit_pending=self.client_lifetime.missing_since is not None)
         data.update(follow=self.monitor.selected,thread_id=self.live_status.get('thread_id'),live_state=self.live_status.get('state'),owner=self.controller.owner,scale=self.requested_scale,display_scale=self.scale_factor,window_size=[self.width(),self.height()])
         try:
