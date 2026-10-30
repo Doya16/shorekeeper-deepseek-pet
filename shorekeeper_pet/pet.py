@@ -22,6 +22,7 @@ from .presentation_size import EdgeResize
 from .media_library import load_catalog
 from .presets import load_defaults,default_bindings
 from .update_ui import UpdateController
+from .lock_button import LockButton
 
 SETTINGS=ROOT/'settings.json'
 STATES={
@@ -130,6 +131,7 @@ class Pet(PetRenderer,QWidget):
         self.hovered=False; self.ignore_release=False
         self.click_timer=QTimer(self); self.click_timer.setSingleShot(True); self.click_timer.timeout.connect(lambda:self.react('pet'))
         self.hover_timer=QTimer(self); self.hover_timer.setSingleShot(True); self.hover_timer.timeout.connect(self.hover_react)
+        self.lock_button=LockButton(self)
         icon_im=self.animation.frames[0].scaled(64,64,Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
         self.icon=QIcon(str(ROOT/'assets/shorekeeper.ico'))
         if self.icon.isNull(): self.icon=QIcon(QPixmap.fromImage(icon_im))
@@ -302,6 +304,7 @@ class Pet(PetRenderer,QWidget):
             if self.controller.owner=='preview' and self.preview_audio_clip is not None:
                 binding=dict(binding,audio_clips=[dict(self.preview_audio_clip,enabled=True)])
             self.voice.trigger(self.state,binding,self.options,preview=self.controller.owner=='preview',task=task_key(self.notification or self.live_status),notification=self.controller.owner=='notification'); self.update_layout()
+        self.lock_button.refresh_visibility()
         self.update_bubble()
         self.update()
 
@@ -348,6 +351,7 @@ class Pet(PetRenderer,QWidget):
             self.drag_offset=event.globalPosition().toPoint()-self.pos(); self.drag_origin=event.globalPosition().toPoint(); self.dragged=False
 
     def mouseMoveEvent(self, event):
+        self.lock_button.refresh_visibility()
         if self.locked: event.accept(); return
         if self.quota_resize.move(event,self.quota_hit_rect()): return
         if self.drag_offset is not None and event.buttons()&Qt.MouseButton.LeftButton:
@@ -385,6 +389,7 @@ class Pet(PetRenderer,QWidget):
         else: event.ignore()
 
     def enterEvent(self,event):
+        self.lock_button.refresh_visibility()
         if not self.locked: self.hover_timer.start(1000)
         super().enterEvent(event)
 
@@ -396,7 +401,7 @@ class Pet(PetRenderer,QWidget):
         super().leaveEvent(event)
 
     def hover_react(self):
-        if self.locked: return
+        if self.locked or self.lock_button.geometry().contains(self.mapFromGlobal(QCursor.pos())): return
         local=self.mapFromGlobal(QCursor.pos())/self.scale_factor
         if not self.quota_resize.active and self.drag_offset is None and not self.override and not self.hovered and self.underMouse() and self.pet_rect.contains(local):
             self.hovered=True; self.react('hover')

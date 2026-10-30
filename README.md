@@ -23,7 +23,7 @@
 ## 开始使用
 
 1. 从 [DeepSeek 官网](https://www.deepseek.com/harness/) 下载 Windows 客户端，启动并登录。
-2. 下载 **Shorekeeper-DeepSeek-Windows-v0.2.0.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
+2. 下载 **Shorekeeper-DeepSeek-Windows-v0.2.1.zip**，完整解压，双击 **守岸人DeepSeek桌宠启动.exe**。
 3. 从 DeepSeek 托盘菜单完全退出客户端。桌宠右键 → **设置 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件**。
 4. 重新打开 Harness，开始任务。桌宠自动跟随最近活动的会话。
 
@@ -34,14 +34,18 @@
 右键桌宠或托盘 → **设置…**，在同一个窗口调整 **字体与大小、交互工作室、桌面与声音、保存与迁移、连接、版本与更新**。GIF、语音字幕、播放频率、启动联动和更新检查都在这里。
 
 - **安静陪伴（静音）**：立即停止当前和待播声音，同时暂停自动语音与试听；取消后恢复原音量，不补播静音期间的声音。
-- **锁定桌宠**：阻止误拖动、单击、双击、悬停和滚轮／拖边缩放。任务动画与完成提醒继续；仍可右键或通过托盘取消锁定。
+- **顶部小锁**：鼠标移到角色身上时，顶部居中会显示小锁，点击即可锁定／解锁；移开鼠标后隐藏，悬停显示“点击锁定”或“点击解锁”。锁定后阻止误拖动、单击、双击、悬停和滚轮／拖边缩放。任务动画与完成提醒继续；仍可右键或通过托盘取消锁定。
 - 两个开关都会自动保存，导出配置素材包或便携完整包时一起携带。旧版开启的“安静陪伴”会转为静音；新加入的锁定默认关闭。
+
+小锁大小可在 **设置 → 桌面与声音** 调整，之后随桌宠整体等比例缩放。
+
+<img src="docs/demo/pet-lock.png" width="180" alt="桌宠顶部小锁（示例）">
 
 ![统一设置中的桌面与声音选项](docs/demo/unified-settings.png)
 
 ## 检查更新与保留配置升级
 
-当前版本：**v0.2.0**。每次启动桌宠后，自动在后台检查 GitHub 正式版本；发现新版才弹出提示。右键 → **设置 → 版本与更新 → 立即检查更新** 可随时手动检查。
+当前版本：**v0.2.1**。每次启动桌宠后，自动在后台检查 GitHub 正式版本；发现新版才弹出提示。右键 → **设置 → 版本与更新 → 立即检查更新** 可随时手动检查。
 
 在 **设置 → 版本与更新** 中，可关闭启动检查、立即检查或恢复已忽略版本的提醒。新版提示支持 **打开更新页面、备份配置与素材、稍后提醒、忽略此版本**。网络检查失败不会打断桌宠。
 
@@ -51,8 +55,8 @@
 
 | 当前情况 | 如何更新 |
 | --- | --- |
-| 已有 v0.1.2 | 下载 [v0.2.0 程序补丁](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.2.0/Shorekeeper-DeepSeek-Settings-Patch-v0.2.0.zip)，退出桌宠，将补丁解压到原目录并覆盖同名文件，然后重新启动 |
-| 首次使用，或安装了其他旧版 | 下载 [v0.2.0 完整包](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.2.0/Shorekeeper-DeepSeek-Windows-v0.2.0.zip)，解压到新目录；已有配置时，再导入自己导出的配置与素材 ZIP |
+| 已有 v0.2.0 | 下载 [v0.2.1 程序补丁](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.2.1/Shorekeeper-DeepSeek-Settings-Patch-v0.2.1.zip)，退出桌宠，将补丁解压到原目录并覆盖同名文件，然后重新启动 |
+| 首次使用，或安装了其他旧版 | 下载 [v0.2.1 完整包](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.2.1/Shorekeeper-DeepSeek-Windows-v0.2.1.zip)，解压到新目录；已有配置时，再导入自己导出的配置与素材 ZIP |
 
 程序补丁保留 **GIF / 图片、音频、气泡字幕、字体和个人设置**。更新前可在 **保存与迁移 → 导出配置与素材包（ZIP）** 留一份备份。程序补丁直接解压覆盖，不在设置中导入。
 

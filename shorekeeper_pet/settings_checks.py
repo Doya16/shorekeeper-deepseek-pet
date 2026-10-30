@@ -26,6 +26,10 @@ def verify_controls(pet):
             started=pet.voice.trigger('pet',binding,pet.options,preview=True)
             pet.set_option('audio_muted',True)
             muted=started and not pet.voice.busy and not pet.voice.pending.isActive() and pet.voice.queued is None and not pet.voice.trigger('pet',binding,pet.options,preview=True)
-        return dict(lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
+        pet.set_option('interaction_locked',False);pet.lock_button.click()
+        direct_lock=pet.locked and pet.lock_button.toolTip()=='点击解锁'
+        pet.lock_button.click()
+        direct_lock=direct_lock and not pet.locked and pet.lock_button.toolTip()=='点击锁定'
+        return dict(lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
     finally:
         pet.voice.stop();pet.options=original;pet.save_settings();pet.preferences.refresh_controls()

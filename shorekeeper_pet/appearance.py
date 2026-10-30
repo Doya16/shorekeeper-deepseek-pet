@@ -1,6 +1,6 @@
 import math
 from PySide6.QtGui import QFont,QFontDatabase
-DEFAULTS=dict(audio_muted=False,interaction_locked=False,check_updates_on_start=True,ignored_update_version='',font_family='LXGW WenKai',bubble_font_family='ZCOOL KuaiLe',bubble_font_size=19,quota_font_size=17,ui_font_size=17,bubble_width=390,bubble_width_ratio=1.0,quota_scale=1.0,pet_size=230,volume=75,audio_enabled=False,audio_cooldown=12,audio_directory='audio',deepseek_home='',deepseek_executable='',launch_with_deepseek=False)
+DEFAULTS=dict(lock_button_size=100,lock_button_transparency=35,audio_muted=False,interaction_locked=False,check_updates_on_start=True,ignored_update_version='',font_family='LXGW WenKai',bubble_font_family='ZCOOL KuaiLe',bubble_font_size=19,quota_font_size=17,ui_font_size=17,bubble_width=390,bubble_width_ratio=1.0,quota_scale=1.0,pet_size=230,volume=75,audio_enabled=False,audio_cooldown=12,audio_directory='audio',deepseek_home='',deepseek_executable='',launch_with_deepseek=False)
 
 def load_fonts(root):
     families=[]
@@ -13,7 +13,7 @@ def load_fonts(root):
 def appearance(settings):
     result=dict(DEFAULTS); item=settings.get('appearance',{})
     if isinstance(item,dict): result.update({k:v for k,v in item.items() if k in DEFAULTS})
-    for key,low,high in [('bubble_font_size',12,40),('quota_font_size',12,32),('ui_font_size',13,28),('bubble_width',300,650),('bubble_width_ratio',.75,4),('quota_scale',.5,2.5),('pet_size',140,420),('volume',0,100),('audio_cooldown',0,300)]:
+    for key,low,high in [('lock_button_size',50,200),('lock_button_transparency',0,90),('bubble_font_size',12,40),('quota_font_size',12,32),('ui_font_size',13,28),('bubble_width',300,650),('bubble_width_ratio',.75,4),('quota_scale',.5,2.5),('pet_size',140,420),('volume',0,100),('audio_cooldown',0,300)]:
         value=result[key]; result[key]=max(low,min(high,value)) if isinstance(value,(float,int)) and math.isfinite(value) else DEFAULTS[key]
     for key in ('font_family','bubble_font_family','audio_directory','deepseek_home','deepseek_executable'):
         if not isinstance(result[key],str): result[key]=DEFAULTS[key]

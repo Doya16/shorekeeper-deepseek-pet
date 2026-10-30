@@ -2,7 +2,7 @@
 import copy,json,pathlib,shutil,tempfile,unittest,wave
 from unittest.mock import patch
 from PySide6.QtCore import Qt,QPoint,QPointF,QEvent
-from PySide6.QtGui import QMouseEvent,QWheelEvent
+from PySide6.QtGui import QMouseEvent,QWheelEvent,QEnterEvent
 from PySide6.QtWidgets import QApplication,QPushButton
 from shorekeeper_pet import pet as module
 from shorekeeper_pet.config_io import save_atomic,migrate_settings,export_bundle,import_bundle
@@ -113,6 +113,67 @@ class SettingsControlsTests(unittest.TestCase):
             for name in ['audio/voice.wav','fonts/test.otf',module.ASSETS[self.aid]['path']]:self.assertEqual((source/name).read_bytes(),(self.root/name).read_bytes())
         with patch.object(p,'refresh_assets',return_value=[]): p.apply_settings(cfg)
         self.assertTrue(p.locked);self.assertTrue(p.options['audio_muted'])
+
+    def test_direct_lock_clicks_toggle_without_drag_or_character_reaction(self):
+        p=self.pet;button=p.lock_button;point=QPointF(button.rect().center())
+        before=(p.pos(),p.controller.serial)
+        for expected,tip in ((True,'点击解锁'),(False,'点击锁定')):
+            self.mouse(button,QEvent.Type.MouseButtonPress,point)
+            self.mouse(button,QEvent.Type.MouseButtonRelease,point)
+            self.assertEqual(p.locked,expected);self.assertEqual(button.isChecked(),expected)
+            self.assertEqual(button.toolTip(),tip)
+            self.assertEqual((p.pos(),p.controller.serial),before)
+            self.assertIsNone(p.drag_offset);self.assertFalse(p.click_timer.isActive())
+        self.mouse(button,QEvent.Type.MouseButtonPress,point)
+        outside=QPointF(button.width()+30,button.height()+30)
+        self.mouse(button,QEvent.Type.MouseMove,outside)
+        self.mouse(button,QEvent.Type.MouseButtonRelease,outside)
+        self.assertFalse(p.locked);self.assertEqual(p.pos(),before[0])
+
+    def test_lock_button_stays_centered_and_syncs_settings_and_hover(self):
+        p=self.pet;button=p.lock_button
+        for scale in (.5,1,1.5):
+            p.set_scale(scale)
+            self.assertAlmostEqual(button.x()+button.width()/2,p.pet_rect.center().x()*p.scale_factor,delta=1)
+            self.assertEqual(button.y(),round(p.pet_rect.top()*p.scale_factor))
+            self.assertTrue(p.rect().contains(button.geometry()))
+        p.hover_timer.start(500);p.click_timer.start(500);serial=p.controller.serial
+        point=QPointF(button.rect().center())
+        QApplication.sendEvent(button,QEnterEvent(point,point,QPointF(button.mapToGlobal(point.toPoint()))))
+        self.assertFalse(p.hover_timer.isActive());self.assertFalse(p.click_timer.isActive())
+        self.assertEqual(p.controller.serial,serial)
+        p.open_preferences('桌面与声音')
+        p.preferences.controls['interaction_locked'].setChecked(True)
+        self.assertTrue(button.isChecked());self.assertEqual(button.toolTip(),'点击解锁')
+        button.click();self.assertFalse(p.preferences.controls['interaction_locked'].isChecked())
+
+    def test_lock_transparency_changes_pixels_and_survives_export(self):
+        p=self.pet;p.open_preferences('桌面与声音');spin=p.preferences.controls['lock_button_transparency']
+        spin.setValue(0);solid=p.lock_button.grab().toImage()
+        spin.setValue(80);faint=p.lock_button.grab().toImage()
+        solid_alpha=sum(solid.pixelColor(x,y).alpha() for y in range(solid.height()) for x in range(solid.width()))
+        faint_alpha=sum(faint.pixelColor(x,y).alpha() for y in range(faint.height()) for x in range(faint.width()))
+        self.assertGreater(solid_alpha,faint_alpha*3)
+        p.preferences.controls['lock_button_size'].setValue(135)
+        cfg=module.load_settings();self.assertEqual(cfg['appearance']['lock_button_transparency'],80)
+        archive=self.root.parent/'lock.zip';self.assertEqual(export_bundle(archive,cfg,self.root),[])
+        restored=import_bundle(archive,self.root.parent/'换电脑')
+        self.assertEqual(restored['appearance']['lock_button_transparency'],80)
+        self.assertEqual(restored['appearance']['lock_button_size'],135)
+
+    def test_hover_reveals_lock_even_when_locked_and_size_scales_proportionally(self):
+        p=self.pet;b=p.lock_button
+        with patch('shorekeeper_pet.lock_button.QCursor.pos',return_value=QPoint(-3000,-3000)) as cursor:
+            for locked in (False,True):
+                p.set_option('interaction_locked',locked)
+                cursor.return_value=p.mapToGlobal(QPoint(-30,-30));b.refresh_visibility();self.assertFalse(b.isVisible())
+                cursor.return_value=p.mapToGlobal((p.pet_rect.center()*p.scale_factor).toPoint());b.refresh_visibility();self.assertTrue(b.isVisible())
+                cursor.return_value=p.mapToGlobal(b.geometry().center());b.refresh_visibility();self.assertTrue(b.isVisible())
+                cursor.return_value=p.mapToGlobal(p.quota_hit_rect().center().toPoint());b.refresh_visibility();self.assertFalse(b.isVisible())
+            p.set_scale(1);p.set_option('lock_button_size',75);small=b.width()
+            p.set_option('lock_button_size',150);self.assertAlmostEqual(b.width(),small*2,delta=1)
+            one=b.width();p.set_scale(1.5);self.assertAlmostEqual(b.width(),one*1.5,delta=1)
+            self.assertAlmostEqual(b.x()+b.width()/2,p.pet_rect.center().x()*p.scale_factor,delta=1)
 
     def test_legacy_quiet_migrates_and_explicit_new_preference_wins(self):
         self.assertTrue(migrate_settings({'quiet':True})['appearance']['audio_muted'])
