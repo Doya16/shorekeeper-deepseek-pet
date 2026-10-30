@@ -2,7 +2,7 @@
 
 让守岸人陪你使用 **DeepSeek Harness 官方 Windows 客户端**。任务进行时换表情，完成后用语音和气泡回应。
 
-[Windows 下载](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/latest) · [完整演示](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051.mp4) · [使用指南](docs/USAGE.md) · [English](README.en.md)
+[Windows 下载](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/latest) · [完整演示](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051-r2.mp4) · [使用指南](docs/USAGE.md) · [English](README.en.md)
 
 ![守岸人 DeepSeek 桌宠：自选表情与语音互动](docs/social/cover-landscape.jpg)
 
@@ -14,7 +14,7 @@
 
 ![最新版任务互动、锁定穿透与额度刷新](docs/social/showcase.gif)
 
-[横屏演示 · 1920×1080](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051.mp4) · [竖屏演示 · 1080×1920](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-portrait-v051.mp4)
+[横屏演示 · 1920×1080](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051-r2.mp4) · [竖屏演示 · 1080×1920](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-portrait-v051-r2.mp4)
 
 演示对应 **v0.5.1**，时长 **03:17**。全部换成当前桌宠与设置界面，展示任务跟随、多会话完成提醒、自选素材、语音字幕、锁定穿透、快捷静音、余额刷新、大小字体、图标、启停联动、更新来源与完整迁移。横屏、竖屏分别排版。
 
