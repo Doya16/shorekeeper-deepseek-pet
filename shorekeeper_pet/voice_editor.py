@@ -51,6 +51,7 @@ class VoicePoolEditor(QWidget):
         return title+'\n气泡：'+(text[:66]+('…' if len(text)>66 else '') if text else '无配对气泡（可在下方填写）')
     def update_hint(self,binding,options):
         hints=[]
+        if options.get('audio_muted'): hints.append('安静陪伴（静音）已开启，自动播报和试听均不发声；可在右键菜单或设置中取消。')
         if binding['bubble_mode']!='audio': hints.append('配对文案暂不显示：请在“气泡与字体 → 气泡内容”选择“自定义音频+字幕”。')
         if not options['audio_enabled'] or not binding['audio_enabled']: hints.append('自动语音当前关闭，仍可使用预览按钮；开启声音后参与实际交互。')
         self.pair_hint.setText('\n'.join(hints) or '当前已开启配对显示；抽中哪条语音，就显示这一条的文案。')

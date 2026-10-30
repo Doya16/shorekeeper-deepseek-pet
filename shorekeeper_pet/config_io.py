@@ -11,6 +11,11 @@ def migrate_settings(settings):
     for key in ('codex_home','codex_executable','launch_with_codex'):
         options.pop(key,None)
     legacy=not isinstance(version,int) or version<7; result['schema_version']=7
+    options=result.setdefault('appearance',{})
+    if not isinstance(options,dict): options={}; result['appearance']=options
+    options.setdefault('audio_muted',result.pop('quiet',False) is True)
+    result.pop('quiet',None)
+    options.setdefault('interaction_locked',False)
     bindings=result.get('bindings',{})
     if isinstance(bindings,dict):
         bindings.pop('quota',None)

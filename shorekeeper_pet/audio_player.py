@@ -50,6 +50,9 @@ class VoicePlayer(QObject):
         if binding.get('audio_policy')=='turn': return 2
         return 1
     def trigger(self,state,binding,options,preview=False,now=None,task=None,notification=False):
+        if options.get('audio_muted'):
+            if preview: self.status.emit('安静陪伴（静音）已开启，请先在设置或右键菜单取消静音。')
+            return False
         if not preview and (not options.get('audio_enabled') or not binding.get('audio_enabled',True)): return False
         policy=binding.get('audio_policy','entry')
         if not preview and policy=='session' and state in self.session_played: return False

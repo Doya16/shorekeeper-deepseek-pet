@@ -94,7 +94,7 @@ class PetRenderer:
         if self.voice_bubble(): return True
         if b['bubble_mode']=='audio': return False
         if b['bubble_seconds'] and elapsed>=b['bubble_seconds']: return False
-        return not self.quiet or self.controller.owner=='preview' or self.state in MANUAL|{'done','error','waiting'} or b['bubble_mode']=='custom'
+        return True
 
     def paintEvent(self,event):
         p=QPainter(self); p.setRenderHint(QPainter.RenderHint.Antialiasing); p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform); p.scale(self.scale_factor,self.scale_factor)

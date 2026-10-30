@@ -13,9 +13,9 @@ class Jobs(QObject):
     finished=Signal(str); failed=Signal(str)
 
 class Preferences(QDialog):
-    def __init__(self,pet):
+    def __init__(self,pet,catalog,assets,root):
         super().__init__(None); self.pet=pet; self.loading=True; self.controls={}; self.buttons=[]
-        self.setWindowTitle('守岸人 · 外观、声音与迁移'); self.setWindowIcon(pet.icon); self.resize(790,740); self.setMinimumSize(660,530)
+        self.setWindowTitle(AUDIO_SESSION_NAME+' · 设置'); self.setWindowIcon(pet.icon); self.resize(1120,850); self.setMinimumSize(920,650)
         layout=QVBoxLayout(self); layout.setContentsMargins(20,18,20,18)
         title=QLabel('把陪伴调整成你喜欢的样子'); title.setObjectName('settingsTitle'); layout.addWidget(title)
         self.tabs=QTabWidget(); layout.addWidget(self.tabs,1)
@@ -31,7 +31,16 @@ class Preferences(QDialog):
         visual.addRow('角色基础大小（100%）',self.spin('pet_size',140,420,' px'))
         add=QPushButton('添加本地字体文件…'); add.clicked.connect(self.add_font); visual.addRow(add)
         note=QLabel('已内置站酷快乐体与霞鹜文楷，随迁移包携带，无需安装到系统。单个状态也可以单独设置字体与字号。'); note.setWordWrap(True); visual.addRow(note)
-        voice=self.tab('声音')
+        from .studio import BindingEditor
+        self.editor=BindingEditor(pet,catalog,assets,root,parent=self.tabs)
+        self.tabs.addTab(self.editor,'交互工作室')
+        voice=self.tab('桌面与声音')
+        muted=QCheckBox('安静陪伴（静音）'); muted.toggled.connect(lambda value:self.change('audio_muted',value)); self.controls['audio_muted']=muted; voice.addRow(muted)
+        locked=QCheckBox('锁定桌宠'); locked.toggled.connect(lambda value:self.change('interaction_locked',value)); self.controls['interaction_locked']=locked; voice.addRow(locked)
+        tip=QLabel('静音立即停止声音并暂停后续播报与试听，取消后恢复原音量。锁定可防止拖动、点击、双击、悬停和滚轮／拖边缩放；任务状态与完成提醒继续。右键或托盘可随时取消。'); tip.setWordWrap(True); voice.addRow(tip)
+        self.top=QCheckBox('保持置顶'); self.top.toggled.connect(lambda value:pet.set_top(value) if not self.loading else None); voice.addRow(self.top)
+        self.notes=QCheckBox('气泡显示已公开的任务进度'); self.notes.toggled.connect(lambda value:pet.set_notes(value) if not self.loading else None); voice.addRow(self.notes)
+        self.pack=QComboBox(); self.pack.addItem('163 · 小小守岸人','163'); self.pack.addItem('GB0227 · 近景表情','GB0227'); self.pack.currentIndexChanged.connect(lambda:pet.set_pack(self.pack.currentData()) if not self.loading else None); voice.addRow('默认表情风格',self.pack)
         enabled=QCheckBox('开启本地语音提醒'); enabled.toggled.connect(lambda v:self.change('audio_enabled',v)); self.controls['audio_enabled']=enabled; voice.addRow(enabled)
         voice.addRow('音量',self.spin('volume',0,100,' %'))
         voice.addRow('同一状态最短播报间隔',self.spin('audio_cooldown',0,300,' 秒'))
@@ -69,6 +78,10 @@ class Preferences(QDialog):
         close=QPushButton('完成'); close.clicked.connect(self.hide); layout.addWidget(close)
         self.jobs=Jobs(); self.jobs.finished.connect(self.job_finished); self.jobs.failed.connect(self.job_failed)
         self.refresh_controls(); self.loading=False; self.apply_style()
+    def select_page(self,title):
+        for index in range(self.tabs.count()):
+            if self.tabs.tabText(index)==title: self.tabs.setCurrentIndex(index); break
+
     def tab(self,title):
         scroll=QScrollArea(); scroll.setWidgetResizable(True); body=QWidget(); body.setObjectName('settingsBody'); form=QFormLayout(body); form.setContentsMargins(16,18,16,18); form.setSpacing(16); form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapLongRows); form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow); scroll.setWidget(body); self.tabs.addTab(scroll,title); return form
     def install_bridge(self):
@@ -106,7 +119,8 @@ class Preferences(QDialog):
             elif isinstance(control,QSpinBox): control.setValue(round(value))
             elif isinstance(control,QCheckBox): control.setChecked(bool(value))
             else: control.setText(value)
-        self.refresh_threads(); self.size_control.refresh()
+        self.top.setChecked(self.pet.on_top); self.notes.setChecked(self.pet.show_notes); self.pack.setCurrentIndex(self.pack.findData(self.pet.pack))
+        self.refresh_threads(); self.size_control.refresh(); self.editor.update_timing()
         self.connection_status.setText('当前数据目录：'+str(self.pet.monitor.home)); self.loading=False
     def refresh_threads(self):
         selected=self.pet.monitor.selected; self.sessions.blockSignals(True); self.sessions.clear(); self.sessions.addItem('自动跟随最近活动（推荐）','auto')

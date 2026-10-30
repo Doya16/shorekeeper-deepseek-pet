@@ -139,7 +139,7 @@ class BubbleWidgetTests(unittest.TestCase):
     def test_preview_and_sliders_are_synced_without_playing_audio_or_changing_bindings(self):
         p=self.pet; before=copy.deepcopy(p.bindings.to_dict()); serial=p.controller.serial
         p.set_binding('idle',bubble_mode='off'); before=copy.deepcopy(p.bindings.to_dict())
-        p.open_size(); control=p.size_dialog.presentation_control
+        p.open_size(); control=p.preferences.presentation_control
         control.preview.setChecked(True)
         self.assertTrue(p.bubble_visible()); self.assertIn('预览',p.bubble_text()); self.assertFalse(p.voice.busy)
         control.controls['bubble_width_ratio'][0].setValue(175)
@@ -150,7 +150,7 @@ class BubbleWidgetTests(unittest.TestCase):
         p.set_presentation_size('bubble_width_ratio',1.9)
         self.assertEqual(control.controls['bubble_width_ratio'][1].value(),190)
         self.assertEqual(other.controls['bubble_width_ratio'][1].value(),190)
-        p.size_dialog.hide(); self.assertFalse(p.presentation_previews); self.assertFalse(p.bubble_visible())
+        p.preferences.hide(); self.assertFalse(p.presentation_previews); self.assertFalse(p.bubble_visible())
         self.assertEqual(p.bindings.to_dict(),before); self.assertEqual(p.controller.serial,serial)
 
     def test_bubble_does_not_disappear_mid_resize_when_audio_finishes(self):

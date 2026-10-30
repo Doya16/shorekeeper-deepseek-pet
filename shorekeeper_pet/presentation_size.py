@@ -22,6 +22,7 @@ class EdgeResize:
         self.widget=widget; self.pet=pet; self.key=key; self.active=False; self.text=''; self.state='idle'
 
     def begin(self,event,rect,unit):
+        if self.pet.locked: return False
         side=edge_at(event.position(),rect)
         if event.button()!=Qt.MouseButton.LeftButton or not side: return False
         self.text=self.pet.bubble_text(); self.state=self.pet.bubble_state()
@@ -31,6 +32,8 @@ class EdgeResize:
         self.widget.setCursor(Qt.CursorShape.SizeHorCursor); event.accept(); return True
 
     def move(self,event,rect):
+        if self.pet.locked:
+            self.finish(); self.widget.unsetCursor(); return False
         if self.active:
             value=self.start_value+2*self.side*(event.globalPosition().x()-self.start_x)/self.unit
             self.pet.set_presentation_size(self.key,value,save=False)
