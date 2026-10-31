@@ -109,7 +109,8 @@ class PetRenderer:
         if self.transition_old is not None and fraction<1:
             p.setOpacity(opacity*(1-fraction*2 if fraction<.5 else (fraction-.5)*2)); shown=self.transition_old if fraction<.5 else frame; p.drawImage(self.image_rect(shown),shown)
         else: self.transition_old=None; p.drawImage(self.image_rect(frame),frame)
-        p.setOpacity(1); self.last_image=frame
+        # Reset the animation crossfade, retaining locked-hover opacity for the balance.
+        p.setOpacity(opacity); self.last_image=frame
         p.save(); p.translate(self.quota_rect.topLeft()); quota_scale=self.quota_display_scale*self.quota_pet_factor; p.scale(quota_scale,quota_scale)
         bar=QRectF(0,0,self.quota_base_width/self.quota_pet_factor,self.quota_base_height/self.quota_pet_factor)
         windows=self.quota_data.get('windows') or []; remaining=min((w['remaining'] for w in windows),default=0)

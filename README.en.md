@@ -1,5 +1,7 @@
 # Shorekeeper DeepSeek Desktop Pet
 
+**v0.5.2**: Locked hover now fades both the pet and its quota/balance bar. Refresh, resize, and unlock controls remain usable; settings and media are preserved.
+
 **A companion for the official DeepSeek Harness Windows client, with custom expressions, voice clips, and speech bubbles.**
 
 [Download for Windows](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/latest) · [Watch the demo](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/shorekeeper-deepseek-landscape-v051-r2.mp4) · [User guide (Chinese)](docs/USAGE.md) · [Report an issue](https://github.com/Doya16/shorekeeper-deepseek-pet/issues) · [中文](README.md)
@@ -42,7 +44,7 @@ The **03:17** walkthrough uses **v0.5.1**, with new recordings of the pet and cu
 ## Get started
 
 1. Install the Windows client from the [official DeepSeek Harness website](https://www.deepseek.com/harness/), open it, and sign in.
-2. Download [Shorekeeper-DeepSeek-Windows-v0.5.1.zip](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/Shorekeeper-DeepSeek-Windows-v0.5.1.zip), extract it completely, and run **守岸人DeepSeek桌宠启动.exe**.
+2. Download [Shorekeeper-DeepSeek-Windows-v0.5.2.zip](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.2/Shorekeeper-DeepSeek-Windows-v0.5.2.zip), extract it completely, and run **守岸人DeepSeek桌宠启动.exe**.
 3. Fully quit Harness from its tray menu. Right-click the pet → **设置 → 连接 DeepSeek → 安装 / 更新 Harness 连接插件** (Settings → Connect to DeepSeek → Install / Update Harness Connection Plugin).
 4. Reopen Harness and start a task. The pet follows the most recently active conversation.
 
@@ -81,7 +83,7 @@ Under **设置 → 连接 DeepSeek**, startup and shutdown follow are separate o
 
 ## Checking for updates and keeping your settings
 
-Current version: **v0.5.1**. After each launch, the pet checks for a stable release and prompts you when a newer one is available. Right-click → **设置 → 版本与更新 → 立即检查更新** (Check for updates) to check manually.
+Current version: **v0.5.2**. After each launch, the pet checks for a stable release and prompts you when a newer one is available. Right-click → **设置 → 版本与更新 → 立即检查更新** (Check for updates) to check manually.
 
 Open **设置 → 版本与更新** (Settings → Version & Updates) to disable startup checks, check immediately, or restore ignored version reminders. A new-version prompt lets you open the release page, back up settings and media, remind you later, or ignore that version. A failed background check does not interrupt the pet.
 
@@ -95,8 +97,8 @@ The third-party [GH-Proxy](https://gh-proxy.com/docs/github-accelerator) mirror 
 
 | Your installation | How to update |
 | --- | --- |
-| v0.5.0 | Download the [v0.5.1 program patch](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/Shorekeeper-DeepSeek-Settings-Patch-v0.5.1.zip), exit the pet, extract over its existing folder, and restart |
-| New installation or another older version | Extract the [v0.5.1 full package](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.1/Shorekeeper-DeepSeek-Windows-v0.5.1.zip) into a new folder, then import your exported settings and assets ZIP if you have one |
+| v0.5.1 | Download the [v0.5.2 program patch](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.2/Shorekeeper-DeepSeek-Settings-Patch-v0.5.2.zip), exit the pet, extract over its existing folder, and restart |
+| New installation or another older version | Extract the [v0.5.2 full package](https://github.com/Doya16/shorekeeper-deepseek-pet/releases/download/v0.5.2/Shorekeeper-DeepSeek-Windows-v0.5.2.zip) into a new folder, then import your exported settings and assets ZIP if you have one |
 
 The program patch preserves **GIFs / images, audio, bubble captions, fonts, and personal settings**. Before updating, use **保存与迁移 → 导出配置与素材包（ZIP）** (Save & Migrate → Export Settings & Assets ZIP) to keep a backup. Extract program patches into the application folder; do not import them as settings.
 

@@ -49,6 +49,17 @@ def verify_controls(pet):
         pet.worker.quota_read.emit(ticket,dict(error='test'))
         quota_feedback=quota_feedback and pet.quota_display_label()=='刷新失败'
         pet.quota_refresh.failure_until=0;pet.quota_data=previous_quota;pet.update_layout()
+        # Pixel-check the balance in the distributed executable as well as source tests.
+        before_opacity=pet.pointer_mode.avatar_opacity
+        def quota_alpha():
+            image=pet.grab().toImage(); ratio=image.devicePixelRatio()
+            rect=pet.quota_hit_rect().toAlignedRect()
+            return sum(image.pixelColor(round(x*ratio),round(y*ratio)).alpha()
+                       for y in range(rect.top(),rect.bottom()) for x in range(rect.left(),rect.right()))
+        pet.pointer_mode.avatar_opacity=1; solid_alpha=quota_alpha()
+        pet.pointer_mode.avatar_opacity=.3; faded_alpha=quota_alpha()
+        pet.pointer_mode.avatar_opacity=before_opacity
+        quota_fade=solid_alpha>0 and 0<faded_alpha<solid_alpha*.5
         fade_control='locked_hover_transparency' in pet.preferences.controls
         menu=[a.text() for a in pet.context_menu().actions()]
         menu_check='关闭守岸人' in menu and '锁定桌宠' not in menu and '退出守岸人' not in menu
@@ -125,6 +136,6 @@ def verify_controls(pet):
         control=pet.preferences.controls['update_source']
         control.setCurrentIndex(control.findData('mirror'))
         source_check=source_check and pet.options['update_source']=='mirror' and exit_key in pet.preferences.controls
-        return dict(quota_feedback_check=quota_feedback,client_lifecycle_check=lifecycle_check,update_sources_check=source_check,icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
+        return dict(quota_fade_check=quota_fade,quota_feedback_check=quota_feedback,client_lifecycle_check=lifecycle_check,update_sources_check=source_check,icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
     finally:
         pet.voice.stop();pet.options=original;pet.apply_icon();pet.save_settings();pet.update_layout();pet.preferences.refresh_controls()

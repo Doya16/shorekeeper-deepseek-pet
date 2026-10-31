@@ -256,7 +256,7 @@ class SettingsControlsTests(unittest.TestCase):
                 self.mouse(p,QEvent.Type.MouseButtonRelease,point+QPointF(0,-80))
             refresh.assert_not_called()
 
-    def test_locked_hover_fades_only_avatar_and_retains_control_targets(self):
+    def test_locked_hover_fades_avatar_and_quota_and_retains_control_targets(self):
         p=self.pet;p.transition_old=None;p.set_option('interaction_locked',True)
         with patch('shorekeeper_pet.pointer_mode.QCursor.pos') as cursor:
             cursor.return_value=p.mapToGlobal(QPoint(-40,-40))
@@ -265,15 +265,18 @@ class SettingsControlsTests(unittest.TestCase):
             cursor.return_value=p.mapToGlobal((p.pet_rect.center()*p.scale_factor).toPoint())
             p.lock_button.refresh_visibility();p.pointer_mode.refresh();faint=p.grab().toImage()
             self.assertAlmostEqual(p.pointer_mode.avatar_opacity,.3);self.assertTrue(p.pointer_mode.passthrough)
-            # Alpha is reduced in the character, without fading the balance box.
+            # Both the character and balance use the configured opacity.
             def alpha(image,rect):
                 ratio=image.devicePixelRatio();r=rect.toAlignedRect()
                 return sum(image.pixelColor(round(x*ratio),round(y*ratio)).alpha() for y in range(r.top(),r.bottom()) for x in range(r.left(),r.right()))
             body=p.quota_hit_rect().translated(0,-p.pet_rect.height()*p.scale_factor/2)
             self.assertGreater(alpha(solid,body),alpha(faint,body)*2)
-            self.assertEqual(alpha(solid,p.quota_hit_rect()),alpha(faint,p.quota_hit_rect()))
+            self.assertGreater(alpha(solid,p.quota_hit_rect()),alpha(faint,p.quota_hit_rect())*2)
             for point in (p.lock_button.geometry().center(),p.quota_hit_rect().center().toPoint()):
                 cursor.return_value=p.mapToGlobal(point);p.pointer_mode.refresh();self.assertFalse(p.pointer_mode.passthrough)
+                self.assertAlmostEqual(p.pointer_mode.avatar_opacity,.3)
+            cursor.return_value=p.mapToGlobal(QPoint(-40,-40));p.pointer_mode.refresh()
+            self.assertEqual(alpha(solid,p.quota_hit_rect()),alpha(p.grab().toImage(),p.quota_hit_rect()))
             p.set_option('interaction_locked',False);p.pointer_mode.refresh()
             self.assertEqual(p.pointer_mode.avatar_opacity,1);self.assertFalse(p.pointer_mode.passthrough)
 
