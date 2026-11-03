@@ -35,15 +35,17 @@ class PetRenderer:
         metrics=QFontMetrics(self.quota_font)
         bar_height=max(39,metrics.height()+18)*self.quota_pet_factor
         bar_width=min(230,max(146,metrics.horizontalAdvance(self.quota_label(compact=True))+28))*self.quota_pet_factor
-        self.scale_factor=fitted_scale(self.requested_scale,size+8,size+bar_height+14,area.width(),area.height())
+        fit_height=size+bar_height+14 if opts['show_quota'] else size+8
+        self.scale_factor=fitted_scale(self.requested_scale,size+8,fit_height,area.width(),area.height())
         self.quota_base_width=bar_width; self.quota_base_height=bar_height
         self.quota_display_scale=min(opts['quota_scale'],(area.width()/self.scale_factor-8)/bar_width,(area.height()/self.scale_factor-size-14)/bar_height)
         self.quota_display_scale=max(.1,self.quota_display_scale)
         bar_width*=self.quota_display_scale; bar_height*=self.quota_display_scale
-        width=max(size,bar_width)+8; self.scene_width=width
+        width=max(size,bar_width if opts['show_quota'] else 0)+8; self.scene_width=width
         self.pet_rect=QRectF((width-size)/2,4,size,size)
-        self.quota_rect=QRectF((width-bar_width)/2,size+8,bar_width,bar_height)
-        height=self.quota_rect.bottom()+6; self.scene_height=height
+        self.quota_rect=QRectF((width-bar_width)/2,size+8,bar_width,bar_height) if opts['show_quota'] else QRectF()
+        height=self.quota_rect.bottom()+6 if opts['show_quota'] else self.pet_rect.bottom()+4
+        self.scene_height=height
         target_width=min(size*opts['bubble_width_ratio']*self.scale_factor,area.width())
         center=self.pet_rect.center().x()*self.scale_factor
         self.bubble_left=math.ceil(center-target_width/2)
@@ -111,6 +113,8 @@ class PetRenderer:
         else: self.transition_old=None; p.drawImage(self.image_rect(frame),frame)
         # Reset the animation crossfade, retaining locked-hover opacity for the balance.
         p.setOpacity(opacity); self.last_image=frame
+        if not opts['show_quota']:
+            p.end(); return
         p.save(); p.translate(self.quota_rect.topLeft()); quota_scale=self.quota_display_scale*self.quota_pet_factor; p.scale(quota_scale,quota_scale)
         bar=QRectF(0,0,self.quota_base_width/self.quota_pet_factor,self.quota_base_height/self.quota_pet_factor)
         windows=self.quota_data.get('windows') or []; remaining=min((w['remaining'] for w in windows),default=0)

@@ -61,6 +61,108 @@ class SettingsControlsTests(unittest.TestCase):
         self.assertTrue(p.lock_button.isChecked());p.lock_button.click()
         self.assertFalse(p.locked);self.assertFalse(window.controls['interaction_locked'].isChecked())
 
+    def test_balance_visibility_menu_position_settings_sync_and_no_layout_jump(self):
+        p=self.pet;p.open_preferences('字体与大小');p.move(320,180)
+        p.set_presentation_size('quota_scale',2.2)
+        control=p.preferences.presentation_control
+        anchor=lambda:p.mapToGlobal((p.pet_rect.center()*p.scale_factor).toPoint())
+        before=(anchor(),p.pet_rect.size(),p.scale_factor,p.size(),p.controller.serial,p.bubble_text())
+        for menu in (p.context_menu(),p.tray.contextMenu()):
+            menu.aboutToShow.emit();actions=menu.actions();labels=[a.text() for a in actions]
+            self.assertEqual(labels[labels.index('刷新余额')+1],'隐藏余额框')
+            self.assertEqual(sum(s in ('显示余额框','隐藏余额框') for s in labels),1)
+            actions[labels.index('隐藏余额框')].trigger()
+            self.assertFalse(control.quota_visible.isChecked());self.assertTrue(p.quota_rect.isEmpty())
+            self.assertTrue(p.quota_hit_rect().isEmpty());self.assertLess(p.height(),before[3].height())
+            self.assertLess(p.width(),before[3].width());self.assertEqual(p.scene_height,p.pet_rect.bottom()+4)
+            self.assertEqual((anchor(),p.pet_rect.size(),p.scale_factor),(before[0],before[1],before[2]))
+            self.assertEqual((p.controller.serial,p.bubble_text()),(before[4],before[5]))
+            self.assertFalse(control.controls['quota_scale'][0].isEnabled())
+            self.assertIn('隐藏',control.controls['quota_scale'][0].toolTip())
+            self.assertFalse(module.load_settings()['appearance']['show_quota'])
+            self.assertEqual(p.quota_details(),'');self.assertEqual(p.toolTip(),'')
+            menu.aboutToShow.emit();labels=[a.text() for a in menu.actions()]
+            self.assertEqual(labels[labels.index('刷新余额')+1],'显示余额框')
+            control.quota_visible.setChecked(True)
+            self.assertTrue(p.options['show_quota']);self.assertEqual(p.size(),before[3])
+            self.assertEqual(anchor(),before[0]);self.assertEqual(p.options['quota_scale'],2.2)
+            self.assertTrue(control.controls['quota_scale'][0].isEnabled())
+            menu.aboutToShow.emit();self.assertIn('隐藏余额框',[a.text() for a in menu.actions()])
+
+    def test_hidden_balance_has_no_stale_click_resize_or_locked_control_target(self):
+        from shorekeeper_pet.presentation_size import edge_at
+        p=self.pet;old=p.quota_hit_rect();point=old.center()
+        self.mouse(p,QEvent.Type.MouseButtonPress,point)
+        p.set_option('show_quota',False)
+        self.assertIsNone(p.quota_press);self.assertFalse(p.quota_resize.active)
+        with patch.object(p,'refresh_quota') as refresh:
+            self.mouse(p,QEvent.Type.MouseButtonRelease,point)
+            for locked in (False,True):
+                p.set_option('interaction_locked',locked)
+                self.mouse(p,QEvent.Type.MouseButtonPress,point)
+                self.mouse(p,QEvent.Type.MouseButtonRelease,point)
+                self.assertEqual(edge_at(QPointF(0,0),p.quota_hit_rect()),0)
+                p.update_quota_cursor(point);self.assertEqual(p.cursor().shape(),Qt.CursorShape.ArrowCursor)
+            refresh.assert_not_called()
+        with patch('shorekeeper_pet.pointer_mode.QCursor.pos',return_value=p.mapToGlobal(point.toPoint())):
+            p.pointer_mode.refresh();self.assertTrue(p.pointer_mode.passthrough)
+        p.set_option('interaction_locked',False);p.set_option('show_quota',True)
+        p.refresh_event.clear();point=p.quota_hit_rect().center()
+        self.mouse(p,QEvent.Type.MouseButtonPress,point);self.mouse(p,QEvent.Type.MouseButtonRelease,point)
+        self.assertTrue(p.refresh_event.is_set());self.assertEqual(p.quota_display_label(),'刷新中…')
+
+    def test_balance_hidden_persists_restart_json_and_zip_and_old_profiles_default_visible(self):
+        from shorekeeper_pet.appearance import appearance
+        p=self.pet;p.set_option('show_quota',False);p.set_presentation_size('quota_scale',1.65)
+        cfg=module.load_settings();self.assertFalse(appearance(cfg)['show_quota'])
+        for portable in (False,True):
+            if portable:
+                from shorekeeper_pet.paths import EXECUTABLE_NAME
+                (self.root/EXECUTABLE_NAME).write_bytes(b'MZ migration-test')
+            archive=self.root.parent/f'visibility-{portable}.zip'
+            self.assertEqual(export_bundle(archive,cfg,self.root,portable),[])
+            restored=import_bundle(archive,self.root.parent/f'新电脑 {portable}')
+            self.assertFalse(appearance(restored)['show_quota']);self.assertEqual(restored['bindings'],cfg['bindings'])
+            self.assertEqual(restored['appearance']['quota_scale'],1.65)
+            p.set_option('show_quota',True);p.apply_settings(restored);self.assertTrue(p.quota_rect.isEmpty())
+        p.open_preferences();path=self.root/'hidden.json';save_atomic(path,cfg)
+        with patch('shorekeeper_pet.preferences.QFileDialog.getOpenFileName',return_value=(str(path),'JSON')):
+            p.set_option('show_quota',True);p.preferences.import_file()
+        self.assertFalse(p.options['show_quota']);self.assertFalse(p.preferences.presentation_control.quota_visible.isChecked())
+        for version in (0,6,7):
+            old=migrate_settings({'schema_version':version,'appearance':{'quota_scale':1.4},'bindings':cfg['bindings']})
+            self.assertTrue(appearance(old)['show_quota']);p.apply_settings(old);self.assertFalse(p.quota_rect.isEmpty())
+        for malformed in (None,'false',0,[]):
+            self.assertTrue(appearance({'appearance':{'show_quota':malformed}})['show_quota'])
+
+    def test_hidden_balance_fits_screen_without_reserving_footer_or_side_width(self):
+        from PySide6.QtCore import QRect
+        from shorekeeper_pet.sizing import SizeControl,normalize_scale
+        p=self.pet;p.set_option('show_quota',False);p.set_presentation_size('quota_scale',2.5)
+        size=p.options['pet_size']
+        # Small and offset monitors exercise scale fitting and all screen edges.
+        for area in (QRect(0,0,900,700),QRect(-900,30,260,210),QRect(1200,-300,180,200)):
+            with patch.object(p,'screen_area',return_value=area):
+                p.set_scale(2)
+                expected=min(2,area.width()/(size+8),area.height()/(size+8))
+                self.assertAlmostEqual(p.scale_factor,expected)
+                self.assertEqual(p.width(),round((size+8)*expected))
+                self.assertEqual(p.height(),round((size+8)*expected))
+                self.assertTrue(p.quota_hit_rect().isEmpty())
+                for x,y in ((area.left()-1000,area.top()-1000),(area.right()+1000,area.bottom()+1000)):
+                    p.move(x,y);p.clamp_position()
+                    self.assertTrue(area.contains(p.geometry()),(area,p.geometry()))
+                    if x>area.right():
+                        self.assertEqual(p.x()+p.width(),area.right()+1)
+                        self.assertEqual(p.y()+p.height(),area.bottom()+1)
+                        self.assertLessEqual(area.bottom()+1-(p.y()+p.pet_rect.bottom()*p.scale_factor),4*expected+1)
+                    else:self.assertEqual(p.pos(),area.topLeft())
+                control=SizeControl(p);control.fit_screen()
+                requested=round(normalize_scale(area.height()*.27/(size+8))*20)/20
+                self.assertAlmostEqual(p.requested_scale,requested)
+                control.deleteLater()
+        p.set_scale(1);p.clamp_position()
+
     def test_mute_cancels_current_delay_queue_and_late_decode_without_losing_volume(self):
         p=self.pet;p.set_option('audio_enabled',True);voice=p.voice
         self.assertTrue(voice.trigger('pet',p.binding('pet'),p.options))

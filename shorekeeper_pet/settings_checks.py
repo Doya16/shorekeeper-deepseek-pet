@@ -8,6 +8,7 @@ from PySide6.QtWidgets import QApplication
 def verify_controls(pet):
     original=copy.deepcopy(pet.options)
     try:
+        pet.set_option('show_quota',True)
         pet.set_option('interaction_locked',True)
         before=(pet.pos(),pet.controller.serial)
         point=pet.pet_rect.center()*pet.scale_factor
@@ -65,6 +66,31 @@ def verify_controls(pet):
         menu_check='关闭守岸人' in menu and '锁定桌宠' not in menu and '退出守岸人' not in menu
         tip=pet.quota_details()
         tooltip_check=all(text in tip for text in ('*表示额度未更新','拖动余额框修改大小','点击余额框刷新余额')) and 'credits' not in tip and '最近读取' not in tip
+        # Exercise visibility in the actual distributed UI and saved configuration.
+        control=pet.preferences.presentation_control
+        before=(pet.height(),pet.pet_rect.size(),pet.scale_factor,pet.options['quota_scale'])
+        menu=pet.context_menu();labels=[a.text() for a in menu.actions()]
+        visibility_check=labels[labels.index('刷新余额')+1]=='隐藏余额框'
+        menu.actions()[labels.index('隐藏余额框')].trigger()
+        hidden_image=pet.grab().toImage()
+        visibility_check=visibility_check and (pet.quota_rect.isEmpty() and pet.quota_hit_rect().isEmpty()
+            and pet.height()<before[0] and pet.pet_rect.size()==before[1] and pet.scale_factor==before[2]
+            and not control.quota_visible.isChecked() and not control.controls['quota_scale'][0].isEnabled()
+            and not pet.quota_details() and not hidden_image.isNull())
+        saved_pos=pet.pos();area=pet.screen_area()
+        pet.move(area.right()+500,area.bottom()+500);pet.clamp_position()
+        visibility_check=visibility_check and pet.x()+pet.width()==area.right()+1 and pet.y()+pet.height()==area.bottom()+1
+        visibility_check=visibility_check and abs(pet.scene_height-(pet.options['pet_size']+8))<.01
+        pet.move(area.left()-500,area.top()-500);pet.clamp_position()
+        visibility_check=visibility_check and pet.pos()==area.topLeft()
+        pet.move(saved_pos)
+        menu.aboutToShow.emit();labels=[a.text() for a in menu.actions()]
+        visibility_check=visibility_check and labels[labels.index('刷新余额')+1]=='显示余额框'
+        from .pet import load_settings
+        visibility_check=visibility_check and load_settings()['appearance']['show_quota'] is False
+        control.quota_visible.setChecked(True)
+        visibility_check=visibility_check and not pet.quota_rect.isEmpty() and pet.height()==before[0] and pet.options['quota_scale']==before[3]
+        menu.deleteLater()
         from .pointer_mode import set_input_transparent
         import sys,ctypes
         native_input=True
@@ -136,6 +162,6 @@ def verify_controls(pet):
         control=pet.preferences.controls['update_source']
         control.setCurrentIndex(control.findData('mirror'))
         source_check=source_check and pet.options['update_source']=='mirror' and exit_key in pet.preferences.controls
-        return dict(quota_fade_check=quota_fade,quota_feedback_check=quota_feedback,client_lifecycle_check=lifecycle_check,update_sources_check=source_check,icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
+        return dict(quota_visibility_check=visibility_check,quota_fade_check=quota_fade,quota_feedback_check=quota_feedback,client_lifecycle_check=lifecycle_check,update_sources_check=source_check,icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
     finally:
         pet.voice.stop();pet.options=original;pet.apply_icon();pet.save_settings();pet.update_layout();pet.preferences.refresh_controls()

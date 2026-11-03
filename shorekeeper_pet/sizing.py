@@ -39,7 +39,8 @@ class SizeControl(QWidget):
         percent=round(self.pet.requested_scale*100)
         for control in (self.slider,self.percent):
             control.blockSignals(True); control.setValue(percent); control.blockSignals(False)
-        text=f'当前显示：{self.pet.width()} × {self.pet.height()}（含额度条）'
+        detail='含余额框' if self.pet.options['show_quota'] else '余额框已隐藏'
+        text=f'当前显示：{self.pet.width()} × {self.pet.height()}（{detail}）'
         if self.pet.scale_factor+0.005<self.pet.requested_scale: text+=f' · 当前屏幕自动适配为 {self.pet.scale_factor:.0%}'
         self.info.setText(text)
 

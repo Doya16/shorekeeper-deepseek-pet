@@ -16,6 +16,7 @@ def migrate_settings(settings):
     options.setdefault('audio_muted',result.pop('quiet',False) is True)
     result.pop('quiet',None)
     options.setdefault('interaction_locked',False)
+    options.setdefault('show_quota',True)
     bindings=result.get('bindings',{})
     if isinstance(bindings,dict):
         bindings.pop('quota',None)

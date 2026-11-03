@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QWidget,QVBoxLayout,QHBoxLayout,QLabel,QSlider,QSp
 LIMITS={'bubble_width_ratio':(75,400),'quota_scale':(50,250)}
 
 def edge_at(point,rect):
+    if rect.isEmpty(): return 0
     if not rect.adjusted(-7,-2,7,2).contains(point): return 0
     left=abs(point.x()-rect.left()); right=abs(point.x()-rect.right())
     return (-1 if left<right else 1) if min(left,right)<=10 else 0
@@ -53,9 +54,14 @@ class PresentationControl(QWidget):
     def __init__(self,pet,quota=True):
         super().__init__(); self.pet=pet; self.controls={}; self.source=id(self)
         box=QVBoxLayout(self); box.setContentsMargins(0,0,0,0)
-        items=[('气泡宽度','bubble_width_ratio')]+([('配额条大小','quota_scale')] if quota else [])
+        self.quota_visible=None
+        items=[('气泡宽度','bubble_width_ratio')]+([('余额框大小','quota_scale')] if quota else [])
         for label,key in items:
-            box.addWidget(QLabel(label)); row=QHBoxLayout(); slider=QSlider(Qt.Orientation.Horizontal); spin=QSpinBox()
+            heading=QHBoxLayout(); heading.addWidget(QLabel(label)); heading.addStretch()
+            if key=='quota_scale':
+                self.quota_visible=QCheckBox('显示余额框')
+                self.quota_visible.toggled.connect(self.change_visibility); heading.addWidget(self.quota_visible)
+            box.addLayout(heading); row=QHBoxLayout(); slider=QSlider(Qt.Orientation.Horizontal); spin=QSpinBox()
             for control in (slider,spin): control.setRange(*LIMITS[key]); control.setSingleStep(5); control.setAccessibleName(label)
             spin.setSuffix(' %'); spin.setKeyboardTracking(False)
             slider.valueChanged.connect(lambda v,key=key:self.change(key,v)); spin.valueChanged.connect(lambda v,key=key:self.change(key,v))
@@ -69,6 +75,9 @@ class PresentationControl(QWidget):
     def change(self,key,percent):
         if not self.pet.set_presentation_size(key,percent/100): self.info.setText('保存失败，请检查桌宠目录是否可写。')
 
+    def change_visibility(self,visible):
+        if not self.pet.set_option('show_quota',visible): self.info.setText('保存失败，请检查桌宠目录是否可写。')
+
     def reset(self):
         for key in self.controls: self.pet.set_presentation_size(key,1)
 
@@ -76,8 +85,14 @@ class PresentationControl(QWidget):
         for key,controls in self.controls.items():
             for control in controls:
                 control.blockSignals(True); control.setValue(round(self.pet.options[key]*100)); control.blockSignals(False)
+                if key=='quota_scale':
+                    control.setEnabled(self.pet.options['show_quota'])
+                    control.setToolTip('' if self.pet.options['show_quota'] else '余额框隐藏时无法修改大小，请先勾选“显示余额框”。')
         p=self.pet
-        self.info.setText(f'当前气泡宽度 {p.bubble_window.width()} px · 配额条 {round(p.quota_rect.width()*p.scale_factor)} × {round(p.quota_rect.height()*p.scale_factor)} px\n百分比独立保存；屏幕放不下时临时适配，换到大屏后恢复。')
+        if self.quota_visible is not None:
+            self.quota_visible.blockSignals(True); self.quota_visible.setChecked(p.options['show_quota']); self.quota_visible.blockSignals(False)
+        quota_text=f'余额框 {round(p.quota_rect.width()*p.scale_factor)} × {round(p.quota_rect.height()*p.scale_factor)} px' if p.options['show_quota'] else '余额框已隐藏'
+        self.info.setText(f'当前气泡宽度 {p.bubble_window.width()} px · {quota_text}\n百分比独立保存；屏幕放不下时临时适配，换到大屏后恢复。')
 
     def hideEvent(self,event):
         self.preview.setChecked(False); self.pet.set_bubble_preview(self.source,False); super().hideEvent(event)
