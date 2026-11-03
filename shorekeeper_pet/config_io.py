@@ -91,8 +91,18 @@ def export_bundle(destination,settings,root,portable=False):
         runtime=root if (root/EXECUTABLE_NAME).is_file() else root/'dist'/PORTABLE_DIRNAME
         if not (runtime/EXECUTABLE_NAME).is_file(): raise FileNotFoundError('便携运行程序尚未构建，请使用已提供的 Windows 便携版。')
         files[EXECUTABLE_NAME]=runtime/EXECUTABLE_NAME
+        helper=runtime/'tools/shorekeeper-updater.exe'
+        if helper.is_file(): files['tools/shorekeeper-updater.exe']=helper
+        for name in ('BUILD_INFO.json','program-files.json','current-program.json'):
+            if (runtime/name).is_file(): files[name]=runtime/name
         for file in (runtime/'resources').rglob('*'):
             if file.is_file():files[file.relative_to(runtime).as_posix()]=file
+        pointer=runtime/'current-program.json'
+        if pointer.is_file():
+            from .update_recovery import version_dir
+            current=version_dir(runtime,json.loads(pointer.read_text('utf8'))['version'])
+            for file in current.rglob('*'):
+                if file.is_file():files[file.relative_to(runtime).as_posix()]=file
         for file in (runtime/'_internal').rglob('*'):
             if file.is_file(): files[file.relative_to(runtime).as_posix()]=file
         for name in ('README.md','MIGRATION.txt','THIRD_PARTY.txt','requirements.txt','tools/创建桌面快捷方式.cmd','tools/run_pet.py','tools/create_shortcut.ps1','tools/install_deepseek_plugin.ps1'):

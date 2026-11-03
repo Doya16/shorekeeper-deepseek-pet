@@ -81,6 +81,8 @@ class PetRenderer:
     def update_bubble(self):
         if not hasattr(self,'bubble_rect'): return
         bubble=self.bubble_window
+        updates=getattr(self,'updates',None)
+        if updates and updates.notice.refresh(): bubble.hide(); return
         if not self.isVisible() or not self.bubble_visible(): bubble.hide(); return
         center=self.mapToGlobal((self.pet_rect.center()*self.scale_factor).toPoint())
         area=self.screen_area()

@@ -13,6 +13,7 @@ class ReleaseAsset:
     label:str
     url:str
     sha256:str=''
+    bytes:int=0
 
 @dataclass(frozen=True)
 class UpdateResult:
@@ -45,6 +46,7 @@ def parse_release(data,current=VERSION,repository=UPDATE_REPOSITORY):
     prefix='Shorekeeper-DeepSeek-' if 'deepseek' in repository else 'Shorekeeper-'
     number=tag.removeprefix('v')
     allowed={f'{prefix}Windows-v{number}.zip':'下载完整包',f'{prefix}Settings-Patch-v{number}.zip':'下载程序补丁',f'{prefix}SHA256SUMS-v{number}.txt':'下载校验文件'}
+    allowed[f'{prefix}AutoUpdate-v{number}.json']='一键更新清单'
     assets=[];seen=set()
     for asset in data.get('assets',[]) if isinstance(data.get('assets',[]),list) else []:
         if not isinstance(asset,dict):continue
@@ -53,7 +55,7 @@ def parse_release(data,current=VERSION,repository=UPDATE_REPOSITORY):
         seen.add(name);digest=asset.get('digest') or ''
         sha=digest[7:] if isinstance(digest,str) and re.fullmatch(r'sha256:[0-9a-f]{64}',digest) else ''
         link='https://github.com/'+repository+'/releases/download/'+urllib.parse.quote(tag,safe='')+'/'+name
-        assets.append(ReleaseAsset(name,allowed[name],link,sha))
+        assets.append(ReleaseAsset(name,allowed[name],link,sha,asset.get('size',0)))
     return UpdateResult('available' if version>version_tuple(current) else 'current',number,url,notes[:12000],assets=tuple(assets))
 
 def check_latest(current=VERSION,repository=UPDATE_REPOSITORY,opener=None,source='auto'):

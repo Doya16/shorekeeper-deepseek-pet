@@ -125,11 +125,11 @@ class UpdateWidgetTests(unittest.TestCase):
         self.controller.manual_requested=True;self.controller._finished(self.result())
         self.assertTrue(self.controller.dialog.isVisible())
         self.controller.dialog.close();self.controller._finished(updates.UpdateResult('available','10.0.0'))
-        self.assertEqual(self.controller.dialog.result.version,'10.0.0')
+        self.assertEqual(self.controller.latest.version,'10.0.0');self.assertTrue(self.controller.notice.isVisible())
     def test_ignore_is_saved_but_dismiss_does_not_change_settings(self):
-        self.controller._finished(self.result());before=copy.deepcopy(self.pet.settings)
+        self.controller.manual_requested=True;self.controller._finished(self.result());before=copy.deepcopy(self.pet.settings)
         self.controller.dialog.reject();self.assertEqual(self.pet.settings,before)
-        self.controller._finished(self.result());self.controller.dialog.ignore_button.click()
+        self.controller.manual_requested=True;self.controller._finished(self.result());self.controller.dialog.ignore_button.click()
         data=json.loads((self.root/'settings.json').read_text('utf8'))
         self.assertEqual(data['appearance']['ignored_update_version'],'9.9.9')
         self.assertEqual(data['bindings'],before['bindings'])
@@ -142,7 +142,7 @@ class UpdateWidgetTests(unittest.TestCase):
         self.assertIn('来源已更换',self.controller.status)
     def test_download_button_uses_user_selected_source(self):
         from unittest.mock import patch
-        self.controller._finished(self.result());dialog=self.controller.dialog
+        self.controller.manual_requested=True;self.controller._finished(self.result());dialog=self.controller.dialog
         asset=updates.ReleaseAsset('test.zip','下载','https://github.com/'+UPDATE_REPOSITORY+'/releases/download/v9.9.9/test.zip')
         self.pet.options['update_source']='mirror'
         with patch.object(update_ui.QDesktopServices,'openUrl',return_value=True) as open_url:

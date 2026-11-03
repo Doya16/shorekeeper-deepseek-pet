@@ -1,9 +1,9 @@
-import os,pathlib,subprocess,sys,shutil
+import os,pathlib,subprocess,sys,shutil,json
 sys.stdout.reconfigure(encoding='utf8')
 root=pathlib.Path(__file__).resolve().parents[1]
 subprocess.run([sys.executable,str(root/'tools/package_plugin.py')],check=True)
 sys.path.insert(0,str(root))
-from shorekeeper_pet.paths import APP_NAME,PORTABLE_DIRNAME
+from shorekeeper_pet.paths import APP_NAME,PORTABLE_DIRNAME,VERSION
 args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onedir','--windowed','--name',APP_NAME,'--icon',str(root/'resources/icons/app.ico'),'--version-file',str(root/'tools/windows_version.txt'),'--paths',str(root),'--distpath',str(root/'dist'),'--workpath',str(root/'build'),'--specpath',str(root/'build')]
 for module in ('pandas','scipy','matplotlib','tkinter','PySide6.QtWebEngineCore','PySide6.QtQml'): args+=['--exclude-module',module]
 args+=[str(root/'tools/run_pet.py')]
@@ -28,5 +28,18 @@ shutil.copytree(root/'docs',dest/'docs')
 (dest/'tools').mkdir()
 for name in ('创建桌面快捷方式.cmd','run_pet.py','create_shortcut.ps1','install_deepseek_plugin.ps1'): shutil.copy2(root/'tools'/name,dest/'tools'/name)
 shutil.copytree(root/'integrations',dest/'integrations',ignore=shutil.ignore_patterns('*.test.js'))
+# The independent helper runs outside the directory that it replaces.
+helper_dest=root/'build/updater-dist'
+helper_args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onefile','--windowed','--name','shorekeeper-updater','--icon',str(root/'resources/icons/app.ico'),'--paths',str(root),'--distpath',str(helper_dest),'--workpath',str(root/'build/updater'),'--specpath',str(root/'build/updater'),'--exclude-module','PySide6','--exclude-module','numpy','--exclude-module','PIL',str(root/'tools/run_updater.py')]
+subprocess.run(helper_args,cwd=root,env=env,check=True)
+shutil.copy2(helper_dest/'shorekeeper-updater.exe',dest/'tools/shorekeeper-updater.exe')
+# Keep a permanent, small launcher at the familiar path. Runtime versions are immutable.
+core=dest/'.programs'/VERSION;core.mkdir(parents=True)
+for name in (APP_NAME+'.exe','_internal'):(dest/name).rename(core/name)
+bootstrap_dest=root/'build/bootstrap-dist'
+bootstrap_args=[sys.executable,'-m','PyInstaller','--clean','--noconfirm','--onefile','--windowed','--name',APP_NAME,'--icon',str(root/'resources/icons/app.ico'),'--version-file',str(root/'tools/windows_version.txt'),'--paths',str(root),'--distpath',str(bootstrap_dest),'--workpath',str(root/'build/bootstrap'),'--specpath',str(root/'build/bootstrap'),'--exclude-module','PySide6','--exclude-module','numpy','--exclude-module','PIL',str(root/'tools/run_bootstrap.py')]
+subprocess.run(bootstrap_args,cwd=root,env=env,check=True)
+shutil.copy2(bootstrap_dest/(APP_NAME+'.exe'),dest/(APP_NAME+'.exe'))
+(dest/'current-program.json').write_text(json.dumps({'version':VERSION})+'\n',encoding='utf8')
 subprocess.run([sys.executable,str(root/'tools/verify_portable.py'),str(dest)],cwd=root,check=True)
 print('Built '+str(dest))

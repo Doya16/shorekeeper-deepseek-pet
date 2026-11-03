@@ -494,7 +494,10 @@
     "tray_icon_style": "badged",
     "exit_with_deepseek": true,
     "update_source": "auto",
-    "show_quota": true
+    "show_quota": true,
+    "check_updates_periodic": true,
+    "update_interval_hours": 6,
+    "update_snoozed_date": ""
   },
   "pack": "163",
   "thread": "auto",

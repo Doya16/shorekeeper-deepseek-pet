@@ -547,6 +547,8 @@ class Pet(PetRenderer,QWidget):
         if key=='interaction_locked' and value: self.cancel_pointer_interaction()
         if key in ('audio_muted','interaction_locked') and self.preferences: self.preferences.refresh_controls()
         if key.startswith('deepseek'): self.refresh_event.set()
+        if key in ('check_updates_periodic','update_interval_hours','ignored_update_version','update_snoozed_date'):
+            self.updates.reconfigure()
         return ok
 
     def quota_hit_rect(self):
@@ -660,6 +662,7 @@ class Pet(PetRenderer,QWidget):
     def write_health(self):
         data=dict(version=VERSION,pid=os.getpid(),updated_at=time.time(),state=self.state,visible=self.isVisible(),quota_source=self.quota_data.get('source'),quota_updated_at=self.quota_data.get('updated_at'),quota_available=bool(self.quota_data.get('wallets')),rate_error=self.quota_data.get('error'),thread_count=len(self.thread_list),animation=self.animation_id,custom_bindings=len(self.bindings.overrides),font=self.options['bubble_font_family'])
         data.update(audio_muted=self.options['audio_muted'],interaction_locked=self.locked,quota_refresh_status=self.quota_refresh.label())
+        data['update_token']=os.environ.get('SHOREKEEPER_UPDATE_TOKEN','')
         data.update(update_status=self.updates.status,update_check_pending=self.updates.busy,client_seen=self.client_lifetime.seen,client_exit_pending=self.client_lifetime.missing_since is not None)
         data.update(follow=self.monitor.selected,thread_id=self.live_status.get('thread_id'),live_state=self.live_status.get('state'),owner=self.controller.owner,scale=self.requested_scale,display_scale=self.scale_factor,window_size=[self.width(),self.height()])
         try:
@@ -688,7 +691,7 @@ def main():
     if not args.preview and not args.smoke_test and not args.verify_package and not lock.tryLock(100): return 0
     if not args.preview and not args.smoke_test and not args.verify_package:
         from .startup import configure
-        if appearance(load_settings())['launch_with_deepseek']:
+        if not os.environ.get('SHOREKEEPER_UPDATE_TOKEN') and appearance(load_settings())['launch_with_deepseek']:
             try:configure(True,ROOT)
             except OSError:pass
     pet=Pet(offline=args.preview or args.smoke_test or args.verify_package); pet.show()
@@ -698,7 +701,8 @@ def main():
     if args.bindings: pet.open_bindings()
     if args.settings: pet.open_preferences()
     health_timer=QTimer(); health_timer.timeout.connect(pet.write_health)
-    if not args.preview and not args.smoke_test: health_timer.start(5000)
+    if os.environ.get('SHOREKEEPER_UPDATE_TOKEN'): health_timer.start(1000)
+    elif not args.preview and not args.smoke_test: health_timer.start(5000)
     if args.capture_after:
         (ROOT/'qa').mkdir(exist_ok=True)
         QTimer.singleShot(args.capture_after*1000,lambda:pet.grab().save(str(ROOT/'qa/live-preview.png')))
