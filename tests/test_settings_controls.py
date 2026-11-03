@@ -41,6 +41,12 @@ class SettingsControlsTests(unittest.TestCase):
         event=QMouseEvent(kind,local,QPointF(global_pos),button,button,Qt.KeyboardModifier.NoModifier)
         QApplication.sendEvent(widget,event)
 
+    def test_update_notice_and_periodic_controls_in_actual_pet(self):
+        from shorekeeper_pet import update_checks
+        self.pet.open_preferences()
+        with patch.object(update_checks,'ROOT',self.root):
+            self.assertTrue(all(update_checks.verify_update_controls(self.pet).values()))
+
     def test_one_settings_window_contains_every_entry_and_update_check(self):
         p=self.pet
         for menu in (p.context_menu(),p.tray.contextMenu()):

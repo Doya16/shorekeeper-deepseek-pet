@@ -10,7 +10,7 @@ def verify_update_controls(pet):
     old_preview=getattr(pet,'presentation_previews',None);old_visible=pet.bubble_visible
     try:
         pet.options.update(ignored_update_version='',update_snoozed_date='')
-        pet.presentation_previews=False;pet.voice.stop()
+        pet.presentation_previews=set();pet.voice.stop()
         controller.latest=UpdateResult('available',version='99.0.0',notes='离线界面验证')
         pet.show();pet.bubble_visible=lambda:True
         shown=controller.notice.refresh() and controller.notice.isVisible()
