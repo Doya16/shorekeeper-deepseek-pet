@@ -25,3 +25,7 @@
 | Shorekeeper-DeepSeek-Program-Update-v0.6.0.zip | 124573556 | `248bc9d79dfe57e3b57ebdc88a2337b4ed83fcb6e30293d09fcf9e2112d6653e` |
 | Shorekeeper-DeepSeek-AutoUpdate-v0.6.0.json | 53538 | `a679fd5fabcc4aaabb9e1d906292a295a5cdeeff51fb6458c15ed9da003e7e79` |
 | Shorekeeper-DeepSeek-Settings-Patch-v0.6.0.zip | 124573975 | `f313d9101756585174c89cf93c2b6e1f353a5a398dcf533e69db9c7ed376501b` |
+
+## 公开发行后复核
+
+旧版实际 EXE 能发现本次公开新版。手动程序补丁覆盖后运行实际 EXE 通过，原配置保留。公开 GitHub 元数据、更新清单与程序包均已实际下载，ZIP 及全部文件摘要匹配；5 个发行附件的服务端大小和 SHA-256 与本地测试产物一致。
