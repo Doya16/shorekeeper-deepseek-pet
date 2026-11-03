@@ -96,6 +96,8 @@
 
 镜像加速由第三方 [GH-Proxy](https://gh-proxy.com/docs/github-accelerator) 提供，仅访问公开版本信息和下载文件。镜像可能存在同步延迟，可切回 GitHub 检查。选择会随配置保存和迁移。
 
+<img src="docs/demo/update-notice.png" width="360" alt="无声常驻更新气泡，版本号为示例">
+
 ![版本与更新设置](docs/demo/update-settings.png)
 
 在 **设置 → 版本与更新** 设置检查频率与下载来源。默认每 6 小时检查一次；发现新版后显示无声常驻气泡，语音台词结束后会恢复提醒。
