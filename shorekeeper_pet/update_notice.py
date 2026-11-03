@@ -1,5 +1,6 @@
 """Persistent, silent update card; speech captions temporarily take its place."""
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPainter,QColor,QPen
 from PySide6.QtWidgets import QFrame,QVBoxLayout,QLabel,QPushButton,QWidget,QApplication
 from .appearance import stylesheet
 
@@ -17,6 +18,11 @@ class UpdateNotice(QFrame):
         self.text=QLabel();self.text.setTextFormat(Qt.TextFormat.PlainText);self.text.setWordWrap(True);box.addWidget(self.text)
         self.install_button=QPushButton('更新并重启守岸人');self.install_button.clicked.connect(controller.install);box.addWidget(self.install_button)
         self.snooze_button=QPushButton('今日不再提醒');self.snooze_button.clicked.connect(controller.snooze_today);box.addWidget(self.snooze_button)
+
+    def paintEvent(self,event):
+        painter=QPainter(self);painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(QPen(QColor('#6592c9'),2));painter.setBrush(QColor('#e7f1ff'))
+        painter.drawRoundedRect(self.rect().adjusted(1,1,-1,-1),16,16)
 
     def refresh(self):
         c=self.controller;p=self.pet

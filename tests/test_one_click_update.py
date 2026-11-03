@@ -138,6 +138,20 @@ class OneClickWidgetTests(unittest.TestCase):
         with patch.object(update_ui,'date') as day:
             day.today.return_value=date.fromordinal(date.today().toordinal()+1)
             self.assertTrue(self.controller.notice.refresh())
+    def test_notice_button_downloads_then_hands_off_once_and_saves_first(self):
+        self.pet.save_settings=Mock(return_value=True);self.pet.shutdown=Mock()
+        self.controller._finished(self.result());work=self.root/'download';work.mkdir()
+        def spawn(args,**kwargs):
+            job=json.loads((work/'job.json').read_text('utf8'))
+            (work/'ready.json').write_text(json.dumps({'id':job['id']}),encoding='utf8')
+            child=Mock();child.poll.return_value=None;return child
+        with patch.object(update_ui.sys,'frozen',True,create=True),patch.object(update_ui,'ROOT',self.root),patch.object(package,'prepare',return_value=(work,{})) as prepare,patch.object(update_ui.subprocess,'Popen',side_effect=spawn) as launch:
+            self.controller.notice.install_button.click()
+            self.wait_for(lambda:self.pet.shutdown.called)
+            self.pet.save_settings.assert_called_once();prepare.assert_called_once();launch.assert_called_once()
+            self.assertEqual(json.loads((work/'job.json').read_text('utf8'))['root'],str(self.root))
+            self.controller.notice.install_button.click();self.assertEqual(prepare.call_count,1)
+
     def test_update_preferences_survive_portable_migration(self):
         from shorekeeper_pet.config_io import export_bundle,import_bundle
         self.pet.options.update(check_updates_periodic=False,update_interval_hours=12,update_snoozed_date=date.today().isoformat())
