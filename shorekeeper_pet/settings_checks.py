@@ -162,6 +162,8 @@ def verify_controls(pet):
         control=pet.preferences.controls['update_source']
         control.setCurrentIndex(control.findData('mirror'))
         source_check=source_check and pet.options['update_source']=='mirror' and exit_key in pet.preferences.controls
-        return dict(quota_visibility_check=visibility_check,quota_fade_check=quota_fade,quota_feedback_check=quota_feedback,client_lifecycle_check=lifecycle_check,update_sources_check=source_check,icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
+        from .update_checks import verify_update_controls
+        update_checks=verify_update_controls(pet)
+        return dict(**update_checks,quota_visibility_check=visibility_check,quota_fade_check=quota_fade,quota_feedback_check=quota_feedback,client_lifecycle_check=lifecycle_check,update_sources_check=source_check,icon_switch_check=icon_check,desktop_shortcut_check=shortcut_check,native_input_style_check=native_input,quota_click_check=quota_click,hover_fade_control=fade_control,compact_menu_check=menu_check,quota_tooltip_check=tooltip_check,lock_button_check=direct_lock,lock_pointer_check=locked,unlock_check=unlocked,mute_playback_check=muted)
     finally:
         pet.voice.stop();pet.options=original;pet.apply_icon();pet.save_settings();pet.update_layout();pet.preferences.refresh_controls()

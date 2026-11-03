@@ -103,8 +103,9 @@ def export_bundle(destination,settings,root,portable=False):
             current=version_dir(runtime,json.loads(pointer.read_text('utf8'))['version'])
             for file in current.rglob('*'):
                 if file.is_file():files[file.relative_to(runtime).as_posix()]=file
-        for file in (runtime/'_internal').rglob('*'):
-            if file.is_file(): files[file.relative_to(runtime).as_posix()]=file
+        if not pointer.is_file():
+            for file in (runtime/'_internal').rglob('*'):
+                if file.is_file(): files[file.relative_to(runtime).as_posix()]=file
         for name in ('README.md','MIGRATION.txt','THIRD_PARTY.txt','requirements.txt','tools/创建桌面快捷方式.cmd','tools/run_pet.py','tools/create_shortcut.ps1','tools/install_deepseek_plugin.ps1'):
             if (root/name).is_file(): files[name]=root/name
         for name in ('package.json','index.js','state.js','cordis.patch.yml','dsh-shorekeeper-pet-0.1.2.tgz'):
