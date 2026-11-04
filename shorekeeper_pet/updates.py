@@ -29,6 +29,12 @@ def version_tuple(value):
     if not isinstance(value,str) or not re.fullmatch(r'v?\d{1,5}\.\d{1,5}\.\d{1,5}',value):raise ValueError('Not a stable release version')
     return tuple(map(int,value.removeprefix('v').split('.')))
 
+def readable_notes(text):
+    # The update window shows plain text, so release-page formatting would appear as stray symbols.
+    text=re.sub(r'\[([^\]\n]+)\]\([^)\s]+\)',r'\1',text)
+    text=re.sub(r'^#{1,6}\s+','',text,flags=re.MULTILINE)
+    return text.replace('**','').replace('`','')
+
 def releases_url(repository=UPDATE_REPOSITORY):return 'https://github.com/'+repository+'/releases/latest'
 
 def source_url(url,source,repository=UPDATE_REPOSITORY):

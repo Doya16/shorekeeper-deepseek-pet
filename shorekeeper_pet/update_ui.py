@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushBu
 
 from .appearance import stylesheet
 from .paths import VERSION, AUDIO_SESSION_NAME,ROOT,UPDATE_REPOSITORY
-from .updates import check_latest, releases_url, UpdateResult, source_url, SOURCE_LABELS
+from .updates import check_latest, releases_url, UpdateResult, source_url, SOURCE_LABELS, readable_notes
 
 
 class UpdateDialog(QDialog):
@@ -19,7 +19,7 @@ class UpdateDialog(QDialog):
         self.setWindowTitle(AUDIO_SESSION_NAME + ' · 版本更新')
         self.setWindowIcon(controller.pet.icon)
         self.setMinimumWidth(540)
-        self.resize(660, 480 if result.status == 'available' else 260)
+        self.resize(680, 640 if result.status == 'available' else 260)
         self.setStyleSheet(stylesheet(controller.pet.options))
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 22, 24, 22)
@@ -41,21 +41,13 @@ class UpdateDialog(QDialog):
             layout.addWidget(tip)
             self.notes = QPlainTextEdit()
             self.notes.setReadOnly(True)
-            self.notes.setPlainText(result.notes or ('镜像来源不显示更新说明，可打开更新页面查看。' if result.source=='mirror' else '此版本未填写更新说明，可打开更新页面查看。'))
+            self.notes.setPlainText(readable_notes(result.notes) or ('镜像来源不显示更新说明，可打开更新页面查看。' if result.source=='mirror' else '此版本未填写更新说明，可打开更新页面查看。'))
+            self.notes.setMinimumHeight(220)
             layout.addWidget(self.notes, 1)
         elif result.status == 'unavailable':
             message = QLabel(result.message)
             message.setWordWrap(True)
             layout.addWidget(message)
-        if result.assets:
-            downloads=QHBoxLayout()
-            for asset in result.assets:
-                if asset.name.endswith(('.json','.sig')):continue
-                button=QPushButton(asset.label)
-                button.setToolTip(asset.name+('\nSHA256: '+asset.sha256 if asset.sha256 else ''))
-                button.clicked.connect(lambda checked=False,item=asset:self.open_download(item))
-                downloads.addWidget(button)
-            layout.addLayout(downloads)
         self.browser_status = QLabel()
         self.browser_status.setWordWrap(True)
         layout.addWidget(self.browser_status)
@@ -83,10 +75,6 @@ class UpdateDialog(QDialog):
     def effective_source(self):
         choice=self.controller.pet.options['update_source']
         return self.result.source if choice=='auto' else choice
-
-    def open_download(self,asset):
-        if not QDesktopServices.openUrl(QUrl(source_url(asset.url,self.effective_source()))):
-            self.browser_status.setText('无法打开浏览器，请稍后重试。')
 
     def open_release(self):
         source=self.effective_source()

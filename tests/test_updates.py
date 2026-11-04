@@ -140,14 +140,20 @@ class UpdateWidgetTests(unittest.TestCase):
         self.controller._received(('auto',self.result()))
         self.assertIsNone(self.controller.dialog);self.assertFalse(self.controller.busy)
         self.assertIn('来源已更换',self.controller.status)
-    def test_download_button_uses_user_selected_source(self):
-        from unittest.mock import patch
-        self.controller.manual_requested=True;self.controller._finished(self.result());dialog=self.controller.dialog
-        asset=updates.ReleaseAsset('test.zip','下载','https://github.com/'+UPDATE_REPOSITORY+'/releases/download/v9.9.9/test.zip')
-        self.pet.options['update_source']='mirror'
-        with patch.object(update_ui.QDesktopServices,'openUrl',return_value=True) as open_url:
-            dialog.open_download(asset)
-            self.assertEqual(open_url.call_args.args[0].toString(),updates.MIRROR+asset.url)
+    def test_update_window_has_one_install_action_and_no_download_buttons(self):
+        from dataclasses import replace
+        from PySide6.QtWidgets import QPushButton
+        asset=updates.ReleaseAsset('test.zip','下载完整包','https://github.com/'+UPDATE_REPOSITORY+'/releases/download/v9.9.9/test.zip')
+        self.controller.manual_requested=True;self.controller._finished(replace(self.result(),assets=(asset,)))
+        labels=[b.text() for b in self.controller.dialog.findChildren(QPushButton)]
+        self.assertEqual(labels.count('一键更新'),1);self.assertFalse([t for t in labels if t.startswith('下载')])
+    def test_release_page_formatting_is_removed_from_displayed_notes(self):
+        text='## 标题\n\n**修复：** 使用 `签名`。\n- 一项\n\n[使用说明](https://github.com/a/b) · <script>'
+        self.assertEqual(updates.readable_notes(text),'标题\n\n修复： 使用 签名。\n- 一项\n\n使用说明 · <script>')
+        self.controller.manual_requested=True
+        from dataclasses import replace
+        self.controller._finished(replace(self.result(),notes='**重要**'))
+        self.assertEqual(self.controller.dialog.notes.toPlainText(),'重要')
 
     def test_manual_check_joins_inflight_request_and_plain_text_notes(self):
         ready=threading.Event();done=threading.Event()
