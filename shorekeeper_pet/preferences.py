@@ -79,7 +79,7 @@ class Preferences(QDialog):
         source=QComboBox()
         for text,value in [('自动选择（推荐）','auto'),('GitHub 官方源','github'),('镜像加速（中国大陆网络）','mirror')]:source.addItem(text,value)
         source.currentIndexChanged.connect(lambda:self.change('update_source',source.currentData()));self.controls['update_source']=source;updates.addRow('更新来源',source)
-        source_tip=QLabel('自动模式先尝试 GitHub，连接失败时切换镜像。镜像由 GH-Proxy 提供，仅用于公开版本信息和下载；也可手动固定来源。');source_tip.setWordWrap(True);updates.addRow(source_tip)
+        source_tip=QLabel('自动模式先尝试 GitHub，无法取得结果时切换镜像。镜像由第三方 GH-Proxy 提供，只负责传输；一键更新始终校验发布者签名，校验失败不会安装。也可手动固定来源。');source_tip.setWordWrap(True);updates.addRow(source_tip)
         updates.addRow(QLabel(AUDIO_SESSION_NAME+'  ·  当前版本 v'+VERSION))
         automatic=QCheckBox('每次启动时检查更新'); automatic.toggled.connect(lambda value:self.change('check_updates_on_start',value)); self.controls['check_updates_on_start']=automatic; updates.addRow(automatic)
         periodic=QCheckBox('定时检查更新');periodic.toggled.connect(lambda value:self.change('check_updates_periodic',value));self.controls['check_updates_periodic']=periodic;updates.addRow(periodic)

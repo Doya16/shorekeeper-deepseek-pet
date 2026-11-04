@@ -10,7 +10,13 @@ def atomic_json(path,value):
     path=pathlib.Path(path);temp=path.with_name(path.name+'.tmp')
     with temp.open('w',encoding='utf8',newline='\n') as out:
         json.dump(value,out,ensure_ascii=False,indent=2);out.flush();os.fsync(out.fileno())
-    temp.replace(path)
+    # A reader or scanner holding the target makes Windows refuse the replace for a moment.
+    until=time.monotonic()+10
+    while True:
+        try:temp.replace(path);break
+        except PermissionError:
+            if time.monotonic()>until:raise
+            time.sleep(.1)
 
 def read_json(path,default=None):
     try:return json.loads(pathlib.Path(path).read_text('utf8'))

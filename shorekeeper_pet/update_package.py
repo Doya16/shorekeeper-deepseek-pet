@@ -2,11 +2,13 @@
 import hashlib,json,os,pathlib,re,shutil,stat,urllib.request,zipfile
 from .paths import ROOT,VERSION,UPDATE_REPOSITORY,EXECUTABLE_NAME
 from .updates import source_url,version_tuple
+from .update_signature import verify_manifest
 
 HELPER='shorekeeper-updater.exe'
 MAX_ZIP=350_000_000
 MAX_UNPACKED=1_200_000_000
 MAX_MANIFEST=2_000_000
+MAX_SIGNATURE=256
 PROTECTED={'settings.json','settings.json.bak','voice-history.json','assets','audio','fonts','defaults','exports','backups'}
 
 def prefix(repository=UPDATE_REPOSITORY):
@@ -100,7 +102,9 @@ def fetch(url,destination,size,sha256,source,progress=lambda *_:None,cancel=None
 def prepare(result,source,root=ROOT,progress=lambda *_:None,cancel=None):
     root=pathlib.Path(root).resolve();zip_name,manifest_name=names(result.version)
     asset=next((a for a in result.assets if a.name==manifest_name),None)
-    if not asset or not asset.sha256 or not 0<asset.bytes<=MAX_MANIFEST:
+    signature=next((a for a in result.assets if a.name==manifest_name+'.sig'),None)
+    if (not asset or not asset.sha256 or not 0<asset.bytes<=MAX_MANIFEST
+            or not signature or not signature.sha256 or not 0<signature.bytes<=MAX_SIGNATURE):
         raise ValueError('此版本尚未提供可校验的一键更新包，请稍后重试')
     helper=root/'tools'/HELPER
     if not helper.is_file():raise ValueError('缺少更新助手，请先安装含一键更新功能的版本')
@@ -109,7 +113,11 @@ def prepare(result,source,root=ROOT,progress=lambda *_:None,cancel=None):
     try:
         manifest_path=work/'manifest.json'
         fetch(asset.url,manifest_path,asset.bytes,asset.sha256,source,cancel=cancel)
-        manifest=validate_manifest(json.loads(manifest_path.read_text('utf8')),result.version)
+        signature_path=work/'manifest.sig'
+        fetch(signature.url,signature_path,signature.bytes,signature.sha256,source,cancel=cancel)
+        # Everything below is trusted only through this signature, whichever route carried it.
+        raw=manifest_path.read_bytes();verify_manifest(raw,signature_path.read_text('ascii'))
+        manifest=validate_manifest(json.loads(raw.decode('utf8')),result.version)
         url=f'https://github.com/{UPDATE_REPOSITORY}/releases/download/v{result.version}/{zip_name}'
         archive=work/'program.zip';patch=manifest['patch']
         fetch(url,archive,patch['bytes'],patch['sha256'],source,progress,cancel)

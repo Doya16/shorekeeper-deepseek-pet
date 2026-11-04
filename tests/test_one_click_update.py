@@ -1,8 +1,8 @@
-import copy,hashlib,json,os,pathlib,tempfile,unittest,uuid,zipfile
+import base64,copy,hashlib,io,json,os,pathlib,tempfile,unittest,urllib.error,uuid,zipfile
 from datetime import date
 from types import SimpleNamespace
 from unittest.mock import patch,Mock
-from shorekeeper_pet import update_package as package,update_apply as engine,update_ui
+from shorekeeper_pet import update_package as package,update_apply as engine,update_ui,update_signature as signing,updates
 from shorekeeper_pet.paths import EXECUTABLE_NAME,UPDATE_REPOSITORY
 from shorekeeper_pet.appearance import appearance
 import test_updates
@@ -159,5 +159,117 @@ class OneClickWidgetTests(unittest.TestCase):
         self.assertEqual(export_bundle(archive,self.pet.settings,self.root),[])
         restored=appearance(import_bundle(archive,self.root/'another computer'))
         for key in ('check_updates_periodic','update_interval_hours','update_snoozed_date','show_quota'):self.assertEqual(restored[key],self.pet.options[key])
+
+class AtomicJsonTests(unittest.TestCase):
+    def test_replace_retries_while_another_process_holds_the_target(self):
+        from shorekeeper_pet.update_recovery import atomic_json
+        with tempfile.TemporaryDirectory() as folder:
+            target=pathlib.Path(folder)/'state.json';real=pathlib.Path.replace;calls=[]
+            def busy(self,other):
+                calls.append(other)
+                if len(calls)<3:raise PermissionError(5,'denied')
+                return real(self,other)
+            with patch.object(pathlib.Path,'replace',busy):atomic_json(target,{'ok':True})
+            self.assertEqual(len(calls),3);self.assertEqual(json.loads(target.read_text('utf8')),{'ok':True})
+
+
+class SignatureTests(unittest.TestCase):
+    # RFC 8032 section 7.1, tests 1 to 3.
+    VECTORS=[('d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a','','e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b'),
+        ('3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c','72','92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00'),
+        ('fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025','af82','6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a')]
+    TARGET='9.9.9'
+    TRUSTED=b'\x01'*32
+    ATTACKER=b'\x02'*32
+
+    @staticmethod
+    def public(seed):
+        h=hashlib.sha512(seed).digest();a=(int.from_bytes(h[:32],'little')&((1<<254)-8))|(1<<254)
+        return signing._encode(signing._mul(a,signing.BASE))
+
+    @classmethod
+    def sign(cls,seed,message):
+        h=hashlib.sha512(seed).digest();a=(int.from_bytes(h[:32],'little')&((1<<254)-8))|(1<<254);A=cls.public(seed)
+        r=int.from_bytes(hashlib.sha512(h[32:]+message).digest(),'little')%signing.L;R=signing._encode(signing._mul(r,signing.BASE))
+        k=int.from_bytes(hashlib.sha512(R+A+message).digest(),'little')%signing.L
+        return R+((r+k*a)%signing.L).to_bytes(32,'little')
+
+    def release(self,seed,repository=UPDATE_REPOSITORY,signed=True):
+        files={EXECUTABLE_NAME:b'EXE','tools/'+package.HELPER:b'HELPER',f'.programs/{self.TARGET}/{EXECUTABLE_NAME}':b'CORE',f'.programs/{self.TARGET}/_internal/a.dll':b'DLL'}
+        buffer=io.BytesIO()
+        with zipfile.ZipFile(buffer,'w') as z:
+            for name,data in files.items():z.writestr(name,data)
+        archive=buffer.getvalue();zip_name,manifest_name=package.names(self.TARGET)
+        manifest=json.dumps({'schema':1,'repository':repository,'version':self.TARGET,'minimum_version':'0.0.0','bridge_protocol':1,
+            'patch':{'name':zip_name,'bytes':len(archive),'sha256':hashlib.sha256(archive).hexdigest()},
+            'files':{n:{'bytes':len(v),'sha256':hashlib.sha256(v).hexdigest()} for n,v in files.items()}}).encode()
+        signature=base64.b64encode(self.sign(seed,manifest))+b'\n'
+        served={manifest_name:manifest,zip_name:archive}
+        if signed:served[manifest_name+'.sig']=signature
+        assets=[{'name':n,'size':len(b),'digest':'sha256:'+hashlib.sha256(b).hexdigest()} for n,b in served.items() if n!=zip_name]
+        served['latest']=json.dumps({'draft':False,'prerelease':False,'tag_name':'v'+self.TARGET,'body':'forged notes','assets':assets}).encode()
+        return served
+
+    @staticmethod
+    def opener(served,failure):
+        class Response(io.BytesIO):
+            def __enter__(self):return self
+            def __exit__(self,*_):self.close()
+        def fake(request,timeout=0):
+            url=request.full_url
+            if not url.startswith(updates.MIRROR):raise failure(url)
+            name=url.rsplit('/',1)[-1]
+            if name not in served:raise urllib.error.URLError('missing')
+            return Response(served[name])
+        return fake
+
+    def attempt(self,served,failure):
+        fake=self.opener(served,failure)
+        with tempfile.TemporaryDirectory() as folder,patch.object(signing,'PUBLIC_KEYS',(self.public(self.TRUSTED),)):
+            root=pathlib.Path(folder);(root/'tools').mkdir();(root/'tools'/package.HELPER).write_bytes(b'HELPER')
+            result=updates.check_latest(opener=fake,source='auto');self.assertEqual(result.source,'mirror')
+            defaults=tuple(fake if getattr(d,'__name__','')=='urlopen' else d for d in package.fetch.__defaults__)
+            with patch.object(package.fetch,'__defaults__',defaults):
+                try:
+                    work,manifest=package.prepare(result,'auto',root=root)
+                    self.assertEqual(manifest['version'],self.TARGET);self.assertTrue((work/'program.zip').is_file())
+                    return True
+                except ValueError as error:
+                    self.assertEqual([p for p in (root/'.update-cache').glob('*')],[])
+                    self.last_error=str(error);return False
+
+    FAILURES=[lambda url:urllib.error.URLError('blocked'),lambda url:urllib.error.HTTPError(url,403,'x',None,None),
+              lambda url:urllib.error.HTTPError(url,429,'x',None,None),lambda url:urllib.error.HTTPError(url,500,'x',None,None)]
+
+    def test_rfc8032_vectors_accept_and_reject_changes(self):
+        for public,message,signature in self.VECTORS:
+            A,m,s=map(bytes.fromhex,(public,message,signature))
+            self.assertTrue(signing.verify(m,s,A))
+            self.assertFalse(signing.verify(m+b'x',s,A))
+            self.assertFalse(signing.verify(m,s[:-1]+bytes([s[-1]^1]),A))
+            self.assertFalse(signing.verify(m,s[:32]+(int.from_bytes(s[32:],'little')+signing.L).to_bytes(32,'little'),A))
+            self.assertFalse(signing.verify(m,s[:63],A))
+
+    def test_build_contains_one_valid_release_key(self):
+        self.assertEqual(len(signing.PUBLIC_KEYS),1);self.assertIsNotNone(signing._decode(signing.PUBLIC_KEYS[0]))
+
+    def test_mirror_cannot_forge_release_metadata_manifest_and_package(self):
+        for failure in self.FAILURES:
+            self.assertFalse(self.attempt(self.release(self.ATTACKER),failure));self.assertIn('签名',self.last_error)
+
+    def test_unsigned_release_is_refused(self):
+        self.assertFalse(self.attempt(self.release(self.TRUSTED,signed=False),self.FAILURES[0]));self.assertIn('可校验',self.last_error)
+
+    def test_signed_release_of_another_project_is_refused(self):
+        self.assertFalse(self.attempt(self.release(self.TRUSTED,repository='Doya16/another-project'),self.FAILURES[0]))
+
+    def test_genuine_signed_release_installs_through_mirror(self):
+        for failure in self.FAILURES:self.assertTrue(self.attempt(self.release(self.TRUSTED),failure))
+
+    def test_mirror_release_notes_are_not_displayed(self):
+        fake=self.opener(self.release(self.TRUSTED),self.FAILURES[0])
+        result=updates.check_latest(opener=fake,source='auto')
+        self.assertEqual((result.source,result.notes),('mirror',''))
+
 
 if __name__=='__main__':unittest.main()

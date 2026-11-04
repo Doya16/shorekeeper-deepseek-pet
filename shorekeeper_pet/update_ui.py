@@ -41,7 +41,7 @@ class UpdateDialog(QDialog):
             layout.addWidget(tip)
             self.notes = QPlainTextEdit()
             self.notes.setReadOnly(True)
-            self.notes.setPlainText(result.notes or '此版本未填写更新说明，可打开更新页面查看。')
+            self.notes.setPlainText(result.notes or ('镜像来源不显示更新说明，可打开更新页面查看。' if result.source=='mirror' else '此版本未填写更新说明，可打开更新页面查看。'))
             layout.addWidget(self.notes, 1)
         elif result.status == 'unavailable':
             message = QLabel(result.message)
@@ -50,7 +50,7 @@ class UpdateDialog(QDialog):
         if result.assets:
             downloads=QHBoxLayout()
             for asset in result.assets:
-                if asset.name.endswith('.json'):continue
+                if asset.name.endswith(('.json','.sig')):continue
                 button=QPushButton(asset.label)
                 button.setToolTip(asset.name+('\nSHA256: '+asset.sha256 if asset.sha256 else ''))
                 button.clicked.connect(lambda checked=False,item=asset:self.open_download(item))

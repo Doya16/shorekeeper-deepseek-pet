@@ -47,6 +47,7 @@ def parse_release(data,current=VERSION,repository=UPDATE_REPOSITORY):
     number=tag.removeprefix('v')
     allowed={f'{prefix}Windows-v{number}.zip':'下载完整包',f'{prefix}Settings-Patch-v{number}.zip':'下载程序补丁',f'{prefix}SHA256SUMS-v{number}.txt':'下载校验文件'}
     allowed[f'{prefix}AutoUpdate-v{number}.json']='一键更新清单'
+    allowed[f'{prefix}AutoUpdate-v{number}.json.sig']='一键更新签名'
     assets=[];seen=set()
     for asset in data.get('assets',[]) if isinstance(data.get('assets',[]),list) else []:
         if not isinstance(asset,dict):continue
@@ -67,7 +68,9 @@ def check_latest(current=VERSION,repository=UPDATE_REPOSITORY,opener=None,source
         try:
             with opener(request,timeout=8) as response:raw=response.read(MAX_RESPONSE+1)
             if len(raw)>MAX_RESPONSE:raise ValueError('Release response too large')
-            return replace(parse_release(json.loads(raw.decode('utf8')),current,repository),source=route)
+            result=parse_release(json.loads(raw.decode('utf8')),current,repository)
+            # Notes are not signed, so text carried by a mirror is never shown as ours.
+            return replace(result,source=route,notes=result.notes if route=='github' else '')
         except urllib.error.HTTPError as error:
             message=('该来源暂时限制了请求，请稍后重试或切换来源。' if error.code in (403,429) else '暂时没有可用的正式版本。' if error.code==404 else '暂时无法连接更新来源，请稍后重试。')
         except (OSError,ValueError,TypeError):pass
