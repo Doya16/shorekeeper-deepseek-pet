@@ -1,7 +1,7 @@
 """Damage-number style text that drifts up from the balance box, rests, then fades."""
 import math
 from PySide6.QtCore import Qt,QEasingCurve,QPointF,QRectF,QVariantAnimation
-from PySide6.QtGui import QColor,QFont,QFontMetricsF,QPainter,QPen,QPixmap
+from PySide6.QtGui import QColor,QFont,QFontDatabase,QFontMetricsF,QPainter,QPen,QPixmap
 from PySide6.QtWidgets import QWidget
 from .appearance import font
 
@@ -59,9 +59,26 @@ def lines_of(text):
     return [(text,'cost')] if isinstance(text,str) else [(t,k) for t,k in text if t]
 
 
-def line_font(used,kind):
-    if kind!='time':return used
-    small=QFont(used);small.setPixelSize(max(10,round(used.pixelSize()*SMALL)));return small
+def line_styles(options):
+    """Bold, italic and colour chosen for each line in the settings."""
+    return {kind:dict(bold=options[f'turn_cost_{kind}_bold'],italic=options[f'turn_cost_{kind}_italic'],color=options[f'turn_cost_{kind}_color']) for kind in ('cost','time')}
+
+
+def has_bold_face(family):
+    return any('bold' in s.lower() for s in QFontDatabase.styles(family))
+
+
+def faux_bold(f,kind,styles):
+    """Extra stroke width when bold is chosen for a font without a bold face, else 0."""
+    if not (styles or {}).get(kind,{}).get('bold') or has_bold_face(f.family()):return 0.
+    return max(1.,f.pixelSize()/22)
+
+
+def line_font(used,kind,styles=None):
+    style=(styles or {}).get(kind,{});f=QFont(used)
+    if kind=='time':f.setPixelSize(max(10,round(used.pixelSize()*SMALL)))
+    f.setBold(bool(style.get('bold')) and has_bold_face(f.family()));f.setItalic(bool(style.get('italic')))
+    return f
 
 
 def sample_lines(options):
@@ -69,29 +86,35 @@ def sample_lines(options):
     return [(SAMPLES[k],k) for k in order] or [(SAMPLE,'cost')]
 
 
-def text_size(used,text,outline):
+def text_size(used,text,outline,styles=None):
     edge=math.ceil(outline);lines=lines_of(text)
-    width=max(QFontMetricsF(line_font(used,k)).horizontalAdvance(t) for t,k in lines)
-    height=sum(QFontMetricsF(line_font(used,k)).height() for t,k in lines)
+    # Italic glyphs lean past their advance; leave room so the last letter is not clipped.
+    width=max(QFontMetricsF(line_font(used,k,styles)).horizontalAdvance(t)+faux_bold(line_font(used,k,styles),k,styles)+(QFontMetricsF(line_font(used,k,styles)).height()*.25 if (styles or {}).get(k,{}).get('italic') else 0) for t,k in lines)
+    height=sum(QFontMetricsF(line_font(used,k,styles)).height() for t,k in lines)
     return math.ceil(width)+2*(PAD_X+edge),math.ceil(height)+2*(PAD_Y+edge)
 
 
-def render(used,text,outline,ratio):
+def render(used,text,outline,ratio,styles=None):
     """The text drawn once at the screen's real pixel density, so it stays sharp while it moves."""
-    width,height=text_size(used,text,outline);edge=math.ceil(outline)
+    width,height=text_size(used,text,outline,styles);edge=math.ceil(outline)
     image=QPixmap(round(width*ratio),round(height*ratio));image.setDevicePixelRatio(ratio);image.fill(Qt.GlobalColor.transparent)
     p=QPainter(image);p.setRenderHint(QPainter.RenderHint.Antialiasing);p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
     top=PAD_Y+edge
     for line,kind in lines_of(text):
-        f=line_font(used,kind);metrics=QFontMetricsF(f);p.setFont(f)
-        base=QPointF((width-metrics.horizontalAdvance(line))/2,top+metrics.ascent())
+        f=line_font(used,kind,styles);metrics=QFontMetricsF(f);p.setFont(f)
+        extra=faux_bold(f,kind,styles);base=QPointF((width-metrics.horizontalAdvance(line)-extra)/2,top+metrics.ascent())
+        strokes=[base+QPointF(extra*i/2,0) for i in range(3)] if extra else [base]
         if outline:
             # A halo of the same glyphs, so the outline lines up exactly with the hinted text.
             p.setPen(QColor(255,255,255,240));steps=max(12,round(outline*12))
-            for ring in (outline,outline/2):
-                for i in range(steps):
-                    a=2*math.pi*i/steps;p.drawText(base+QPointF(ring*math.cos(a),ring*math.sin(a)),line)
-        p.setPen(QColor(LINE_COLORS.get(kind,LINE_COLORS['cost'])));p.drawText(base,line);top+=metrics.height()
+            for at in strokes:
+                for ring in (outline,outline/2):
+                    for i in range(steps):
+                        a=2*math.pi*i/steps;p.drawText(at+QPointF(ring*math.cos(a),ring*math.sin(a)),line)
+        colour=QColor((styles or {}).get(kind,{}).get('color') or LINE_COLORS.get(kind,LINE_COLORS['cost']))
+        p.setPen(colour if colour.isValid() else QColor(LINE_COLORS['cost']))
+        for at in strokes:p.drawText(at,line)
+        top+=metrics.height()
     p.end()
     return image
 
@@ -112,8 +135,9 @@ class CostFloat(QWidget):
     def play(self,text):
         self.text=chr(10).join(line for line,kind in lines_of(text));self.used=text_font(self.pet);outline=outline_width(self.pet)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint,self.pet.on_top)
-        self.resize(*text_size(self.used,text,outline))
-        self.image=render(self.used,text,outline,self.pet.devicePixelRatioF())
+        styles=line_styles(self.pet.options)
+        self.resize(*text_size(self.used,text,outline,styles))
+        self.image=render(self.used,text,outline,self.pet.devicePixelRatioF(),styles)
         self.animation.stop();self.advance(0.);self.show();self.animation.start()
 
     def advance(self,value):
@@ -141,10 +165,10 @@ class CostFloatPlacer(QWidget):
         self.sync()
 
     def sync(self):
-        o=self.pet.options;lines=sample_lines(o);key=(o['turn_cost_font_family'],o['turn_cost_font_size'],o['turn_cost_outline'],tuple(lines),self.pet.scale_factor,self.pet.devicePixelRatioF())
+        o=self.pet.options;lines=sample_lines(o);key=(o['turn_cost_font_family'],o['turn_cost_font_size'],o['turn_cost_outline'],tuple(lines),repr(line_styles(o)),self.pet.scale_factor,self.pet.devicePixelRatioF())
         if key!=self.key:
             self.key=key;used=text_font(self.pet);outline=outline_width(self.pet)
-            self.resize(*text_size(used,lines,outline));self.image=render(used,lines,outline,self.pet.devicePixelRatioF());self.update()
+            styles=line_styles(o);self.resize(*text_size(used,lines,outline,styles));self.image=render(used,lines,outline,self.pet.devicePixelRatioF(),styles);self.update()
         if self.grab_at is None:self.place_now()
 
     def rise(self):return round(RISE*self.pet.scale_factor)

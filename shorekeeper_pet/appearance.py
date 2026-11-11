@@ -1,6 +1,6 @@
 import math
 from PySide6.QtGui import QFont,QFontDatabase
-DEFAULTS=dict(turn_cost_style='float',turn_cost_show_cost=True,turn_cost_show_time=True,turn_cost_order='cost,time',celebrate_done=True,edge_dock=True,fullscreen_hide=False,daily_recap=True,turn_cost_font_family='ZCOOL KuaiLe',turn_cost_font_size=35,turn_cost_outline='thin',turn_cost_anchor='inside',rest_reminder=True,rest_interval_minutes=60,dock_tuck_seconds=60,turn_cost_offset_x=0,turn_cost_offset_y=0,check_updates_periodic=True,update_interval_hours=6,update_snoozed_date='',show_quota=True,exit_with_deepseek=True,update_source='auto',tray_icon_style='badged',locked_hover_transparency=70,lock_button_size=100,lock_button_transparency=35,audio_muted=False,interaction_locked=False,check_updates_on_start=True,ignored_update_version='',font_family='LXGW WenKai',bubble_font_family='ZCOOL KuaiLe',bubble_font_size=19,quota_font_size=17,ui_font_size=17,bubble_width=390,bubble_width_ratio=1.0,quota_scale=1.0,pet_size=230,volume=75,audio_enabled=False,audio_cooldown=12,audio_directory='audio',deepseek_home='',deepseek_executable='',launch_with_deepseek=False)
+DEFAULTS=dict(turn_cost_style='float',turn_cost_show_cost=True,turn_cost_show_time=True,turn_cost_order='cost,time',celebrate_done=True,edge_dock=True,fullscreen_hide=False,daily_recap=True,turn_cost_font_family='ZCOOL KuaiLe',turn_cost_font_size=35,turn_cost_outline='thin',turn_cost_anchor='inside',rest_reminder=True,rest_interval_minutes=60,dock_tuck_seconds=60,turn_cost_cost_bold=False,turn_cost_cost_italic=False,turn_cost_cost_color='#e4572e',turn_cost_time_bold=False,turn_cost_time_italic=False,turn_cost_time_color='#2f6db5',turn_cost_offset_x=0,turn_cost_offset_y=0,check_updates_periodic=True,update_interval_hours=6,update_snoozed_date='',show_quota=True,exit_with_deepseek=True,update_source='auto',tray_icon_style='badged',locked_hover_transparency=70,lock_button_size=100,lock_button_transparency=35,audio_muted=False,interaction_locked=False,check_updates_on_start=True,ignored_update_version='',font_family='LXGW WenKai',bubble_font_family='ZCOOL KuaiLe',bubble_font_size=19,quota_font_size=17,ui_font_size=17,bubble_width=390,bubble_width_ratio=1.0,quota_scale=1.0,pet_size=230,volume=75,audio_enabled=False,audio_cooldown=12,audio_directory='audio',deepseek_home='',deepseek_executable='',launch_with_deepseek=False)
 
 def load_fonts(root):
     families=[]
@@ -28,6 +28,10 @@ def appearance(settings):
     if result['turn_cost_outline'] not in ('none','thin','thick'):result['turn_cost_outline']=DEFAULTS['turn_cost_outline']
     if result['turn_cost_anchor'] not in ('bottom','inside','above'):result['turn_cost_anchor']=DEFAULTS['turn_cost_anchor']
     result['rest_reminder']=result['rest_reminder'] is not False
+    for kind in ('cost','time'):
+        for key in (f'turn_cost_{kind}_bold',f'turn_cost_{kind}_italic'):result[key]=result[key] is True
+        colour=result[f'turn_cost_{kind}_color']
+        if not (isinstance(colour,str) and len(colour)==7 and colour[0]=='#' and all(c in '0123456789abcdefABCDEF' for c in colour[1:])):result[f'turn_cost_{kind}_color']=DEFAULTS[f'turn_cost_{kind}_color']
     if result['turn_cost_order'] not in ('cost,time','time,cost'):result['turn_cost_order']=DEFAULTS['turn_cost_order']
     for key in ('turn_cost_show_cost','turn_cost_show_time','celebrate_done','edge_dock','daily_recap'):result[key]=result[key] is not False
     result['fullscreen_hide']=result['fullscreen_hide'] is True

@@ -125,7 +125,7 @@ class CardPreview(QWidget):
         return [(('-¥0.0731' if kind=='cost' else '用时 4分12秒'),kind) for text,kind in lines]
 
     def draw_finish(self,p,ms):
-        from .cost_float import OUTLINES,render,timeline
+        from .cost_float import OUTLINES,line_styles,render,timeline
         self.desk(p);o=self.pet.options;box=self.pet_box(120,bottom=self.height()-26)
         done=ms>=1200;self.draw_art(p,box,'done' if done else 'thinking',ms)
         style=o['turn_cost_style']
@@ -143,7 +143,7 @@ class CardPreview(QWidget):
             used=font(o['turn_cost_font_family'],max(9,round(o['turn_cost_font_size']*SCALE)))
             lines=self.float_lines()
             if lines:
-                image=render(used,lines,OUTLINES.get(o['turn_cost_outline'],0)*SCALE,1.)
+                image=render(used,lines,OUTLINES.get(o['turn_cost_outline'],0)*SCALE,1.,line_styles(o))
                 risen,opacity=timeline(t);anchor=o['turn_cost_anchor']
                 if anchor=='above':base=box.top()
                 elif anchor=='inside':base=box.top()+box.height()*.08+image.height()

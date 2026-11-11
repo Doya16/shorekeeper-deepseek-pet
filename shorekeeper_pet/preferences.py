@@ -17,7 +17,7 @@ class Jobs(QObject):
 
 class Preferences(QDialog):
     def __init__(self,pet,catalog,assets,root):
-        super().__init__(None); self.pet=pet; self.loading=True; self.controls={}; self.buttons=[]; self.previews={}
+        super().__init__(None); self.pet=pet; self.loading=True; self.controls={}; self.buttons=[]; self.previews={}; self.color_buttons={}
         self.setWindowTitle(AUDIO_SESSION_NAME+' · 设置'); self.setWindowIcon(pet.icon); self.resize(1040,780); self.setMinimumSize(760,560)
         layout=QVBoxLayout(self); layout.setContentsMargins(20,18,20,18)
         title=QLabel('把陪伴调整成你喜欢的样子'); title.setObjectName('settingsTitle'); layout.addWidget(title)
@@ -50,6 +50,7 @@ class Preferences(QDialog):
         celebrate=QCheckBox('完成时撒花'); celebrate.toggled.connect(lambda value:self.change('celebrate_done',value)); self.controls['celebrate_done']=celebrate; voice.addRow(celebrate)
         self.order=OrderList([('cost','计费'),('time','计时')]); self.order.changed.connect(self.change_order); voice.addRow('播报内容',self.order)
         voice.addRow('飘字字体',self.combo('turn_cost_font_family',names))
+        for kind,label in (('cost','计费样式'),('time','计时样式')):voice.addRow(label,self.line_style(kind))
         voice.addRow('飘字字号',self.spin('turn_cost_font_size',14,72,' px'))
         outline=QComboBox()
         for label,value in (('细描边','thin'),('粗描边','thick'),('无描边','none')):outline.addItem(label,value)
@@ -139,6 +140,27 @@ class Preferences(QDialog):
     def showEvent(self,event):
         # Start on the tab bar, never inside a choice the keyboard or wheel could change by accident.
         super().showEvent(event); self.tabs.tabBar().setFocus()
+    def line_style(self,kind):
+        """Bold and italic switches and a colour button for one floating-text line."""
+        row=QHBoxLayout(); row.setSpacing(10)
+        for key,label in ((f'turn_cost_{kind}_bold','加粗'),(f'turn_cost_{kind}_italic','斜体')):
+            box=QCheckBox(label); box.toggled.connect(lambda value,key=key:self.change(key,value)); self.controls[key]=box; row.addWidget(box)
+        button=QPushButton('颜色'); button.setObjectName('colorButton'); button.setToolTip('点击打开调色盘')
+        button.clicked.connect(lambda checked=False,kind=kind:self.choose_line_color(kind)); self.color_buttons[kind]=button; row.addWidget(button)
+        reset=QPushButton('默认颜色'); reset.clicked.connect(lambda checked=False,kind=kind:self.set_line_color(kind,None)); row.addWidget(reset); row.addStretch(1)
+        return row
+    def choose_line_color(self,kind):
+        from PySide6.QtGui import QColor
+        from PySide6.QtWidgets import QColorDialog
+        colour=QColorDialog.getColor(QColor(self.pet.options[f'turn_cost_{kind}_color']),self,'计费颜色' if kind=='cost' else '计时颜色')
+        if colour.isValid(): self.set_line_color(kind,colour.name())
+    def set_line_color(self,kind,colour):
+        from .appearance import DEFAULTS
+        self.change(f'turn_cost_{kind}_color',colour or DEFAULTS[f'turn_cost_{kind}_color']); self.paint_color_buttons()
+    def paint_color_buttons(self):
+        for kind,button in self.color_buttons.items():
+            colour=self.pet.options[f'turn_cost_{kind}_color']
+            button.setText('颜色 '+colour.upper()); button.setStyleSheet(f'QPushButton{{border-left:16px solid {colour};padding-left:8px;}}')
     def preview(self,mode):
         view=CardPreview(self.pet,mode); self.previews[mode]=view; return view
     def select_page(self,title):
@@ -183,7 +205,7 @@ class Preferences(QDialog):
             elif isinstance(control,QCheckBox): control.setChecked(bool(value))
             else: control.setText(value)
         self.top.setChecked(self.pet.on_top); self.notes.setChecked(self.pet.show_notes); self.pack.setCurrentIndex(self.pack.findData(self.pet.pack))
-        self.refresh_threads(); self.size_control.refresh(); self.editor.update_timing()
+        self.refresh_threads(); self.size_control.refresh(); self.editor.update_timing(); self.paint_color_buttons()
         self.order.set_state(self.pet.options['turn_cost_order'].split(','),{k:self.pet.options['turn_cost_show_'+k] for k in ('cost','time')})
         self.connection_status.setText('当前数据目录：'+str(self.pet.monitor.home)); self.loading=False
         for combo in self.findChildren(QComboBox):widen(combo)
