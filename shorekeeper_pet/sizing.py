@@ -25,8 +25,8 @@ class SizeControl(QWidget):
         row=QHBoxLayout()
         for title,callback in [('恢复 100%',lambda:pet.set_scale(1)),('适合当前屏幕',self.fit_screen)]:
             button=QPushButton(title); button.clicked.connect(callback); row.addWidget(button)
-        layout.addLayout(row)
-        tip=QLabel('也可将鼠标放在桌宠上，按住 Ctrl 滚轮缩放。角色、气泡和额度条同步调整，所有修改自动保存。'); tip.setWordWrap(True); layout.addWidget(tip)
+        row.addStretch(1); layout.addLayout(row)
+        tip=QLabel('也可将鼠标放在桌宠上，按住 Ctrl 滚轮缩放。角色、气泡和额度条同步调整，所有修改自动保存。'); tip.setObjectName('settingsNote'); tip.setWordWrap(True); layout.addWidget(tip)
         self.slider.valueChanged.connect(self.change); self.percent.valueChanged.connect(self.change)
         pet.size_changed.connect(self.refresh); self.refresh()
     def change(self,percent):
@@ -53,4 +53,6 @@ class SizeDialog(QDialog):
         self.control=SizeControl(pet); content.addWidget(self.control)
         self.presentation_control=PresentationControl(pet); content.addWidget(self.presentation_control)
         done=QPushButton('完成'); done.clicked.connect(self.hide); layout.addWidget(done); self.apply_style()
+        from .settings_layout import WheelGuard
+        self.wheel_guard=WheelGuard(self)
     def apply_style(self): self.setStyleSheet(stylesheet(self.pet.options))

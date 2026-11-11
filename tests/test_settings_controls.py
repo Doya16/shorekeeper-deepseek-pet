@@ -56,7 +56,7 @@ class SettingsControlsTests(unittest.TestCase):
             self.assertIn('安静陪伴（静音）',labels);self.assertNotIn('锁定桌宠',labels);self.assertIn('关闭守岸人',labels);self.assertNotIn('退出守岸人',labels);self.assertFalse(any('回到当前' in x or x=='打开 DeepSeek Harness' for x in labels))
         p.open_bindings();window=p.preferences
         self.assertIs(p.binding_editor.window(),window);self.assertFalse(p.binding_editor.isWindow())
-        self.assertEqual(window.tabs.currentWidget(),p.binding_editor)
+        self.assertEqual(window.tabs.currentWidget().widget(),p.binding_editor)
         p.open_size();self.assertIs(p.preferences,window);self.assertEqual(window.tabs.tabText(window.tabs.currentIndex()),'字体与大小')
         p.open_panel();self.assertIs(p.preferences,window);self.assertIsNone(p.panel);self.assertIsNone(p.size_dialog)
         with patch.object(p.updates,'check') as check:

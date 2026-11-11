@@ -68,8 +68,8 @@ class PresentationControl(QWidget):
             row.addWidget(slider,1); row.addWidget(spin); box.addLayout(row); self.controls[key]=(slider,spin)
         self.info=QLabel(); self.info.setWordWrap(True); box.addWidget(self.info)
         row=QHBoxLayout(); self.preview=QCheckBox('显示气泡预览（无声音）'); self.preview.toggled.connect(lambda on:pet.set_bubble_preview(self.source,on)); row.addWidget(self.preview)
-        reset=QPushButton('恢复比例'); reset.clicked.connect(self.reset); row.addWidget(reset); box.addLayout(row)
-        tip=QLabel('也可拖动气泡或配额条左右两侧的小竖线。气泡只改变宽度；配额条连同文字一起缩放。调整后随桌宠整体缩放，自动保存。'); tip.setWordWrap(True); box.addWidget(tip)
+        row.addSpacing(16); reset=QPushButton('恢复比例'); reset.clicked.connect(self.reset); row.addWidget(reset); row.addStretch(1); box.addLayout(row)
+        tip=QLabel('也可拖动气泡或配额条左右两侧的小竖线。气泡只改变宽度；配额条连同文字一起缩放。调整后随桌宠整体缩放，自动保存。'); tip.setObjectName('settingsNote'); tip.setWordWrap(True); box.addWidget(tip)
         pet.size_changed.connect(self.refresh); self.refresh()
 
     def change(self,key,percent):

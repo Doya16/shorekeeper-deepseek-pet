@@ -107,6 +107,11 @@ class PetRenderer:
         opts=self.options; width=self.scene_width; b=self.binding(self.state)
         elapsed=(time.monotonic()-self.controller.started)*1000
         frame=self.animation.frame(elapsed*b['speed'],playback='once' if self.preview_id else b['playback'])
+        if getattr(self,'mirror_art',False):
+            # One flipped copy per frame, kept while the same frame is on screen.
+            cached=self.mirror_cache
+            if cached is None or cached[0] is not frame: cached=self.mirror_cache=(frame,frame.flipped(Qt.Orientation.Horizontal))
+            frame=cached[1]
         opacity=self.pointer_mode.avatar_opacity
         p.setOpacity(opacity)
         fraction=(time.monotonic()-self.transition_start)/.20

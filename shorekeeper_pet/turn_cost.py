@@ -3,7 +3,8 @@ import time
 from decimal import Decimal
 
 SETTLE_SECONDS=30
-REFRESH_AFTER=(2,8,16,24)
+REFRESH_AFTER=(0,6,12,20)
+HOLD_SECONDS=5
 SYMBOLS={'CNY':'¥','USD':'$'}
 
 
@@ -24,7 +25,8 @@ def money(report):
 
 def bubble_text(report):
     extra='\n期间还有其他任务在跑，这是合计。' if report['shared'] else ''
-    return f'这一轮用了 {money(report)}{extra}'
+    about='大约' if report.get('estimate') else ''
+    return f'这一轮{about}用了 {money(report)}{extra}'
 
 
 class TurnCost:
@@ -33,10 +35,10 @@ class TurnCost:
     def __init__(self,refresh,clock=time.time):
         self.refresh=refresh; self.clock=clock; self.current=None; self.pending=None
 
-    def observe(self,status,quota,others=0):
+    def observe(self,status,quota,others=0,skip=()):
         now=self.clock(); total=balance_total(quota); updated=(quota or {}).get('updated_at',0)
         if status.get('active') and status.get('turn_id'):self.track(status,total,updated,now,others)
-        for event in status.get('events',[]):self.finish(event,now)
+        for event in status.get('events',[]):self.finish(event,now,skip)
         return self.settle(total,updated,now)
 
     def track(self,status,total,updated,now,others):
@@ -52,11 +54,12 @@ class TurnCost:
         if current['before'] is None:current['before']=total
         if others:current['shared']=True
 
-    def finish(self,event,now):
+    def finish(self,event,now,skip=()):
         current=self.current
         if not current or current['key']!=(event.get('thread_id'),event.get('turn_id')):return
         self.current=None
-        if current['before'] is not None:
+        # Turns already priced from their token counts need no balance comparison.
+        if current['before'] is not None and current['key'] not in skip:
             self.pending=dict(current,ended=event.get('ended',now),refreshes=list(REFRESH_AFTER))
 
     def settle(self,total,updated,now):
@@ -68,6 +71,6 @@ class TurnCost:
         currency,before=pending['before']
         if total and total[0]==currency and updated>=pending['ended'] and total[1]<before:
             self.pending=None
-            return dict(amount=before-total[1],currency=currency,shared=pending['shared'])
+            return dict(amount=before-total[1],currency=currency,shared=pending['shared'],ended=pending['ended'],key=pending['key'])
         if age>SETTLE_SECONDS:self.pending=None
         return None
