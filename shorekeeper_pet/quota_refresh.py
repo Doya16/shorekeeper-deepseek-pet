@@ -6,14 +6,15 @@ import time
 class QuotaRefresh:
     def __init__(self, event, clock=time.monotonic):
         self.event=event; self.clock=clock; self.lock=threading.Lock()
-        self.sequence=0; self.pending=None; self.started=0; self.context=None
+        self.sequence=0; self.pending=None; self.started=0; self.context=None; self.silent=False
         self.loading_until=0; self.failure_until=0
 
-    def request(self,context=None):
+    def request(self,context=None,silent=False):
         with self.lock:
             # Repeated clicks coalesce while a request is outstanding.
-            if self.pending is not None and context==self.context:return
-            self.context=context
+            if self.pending is not None and context==self.context:
+                self.silent=self.silent and silent;return
+            self.context=context; self.silent=silent
             self.sequence+=1; self.pending=self.sequence; self.started=self.clock()
             self.loading_until=0; self.failure_until=0
             self.event.set()
@@ -29,11 +30,13 @@ class QuotaRefresh:
         with self.lock:
             if self.pending is None or ticket!=self.pending:return
             self.pending=None
+            if self.silent:
+                self.loading_until=self.failure_until=0;return
             self.loading_until=max(self.clock(),self.started+.6)
             self.failure_until=self.loading_until+2.5 if result.get('error') or result.get('source')!='live' else 0
 
     def label(self):
         with self.lock:
-            if self.pending is not None or self.clock()<self.loading_until:return '刷新中…'
+            if (self.pending is not None and not self.silent) or self.clock()<self.loading_until:return '刷新中…'
             if self.clock()<self.failure_until:return '刷新失败'
             return ''

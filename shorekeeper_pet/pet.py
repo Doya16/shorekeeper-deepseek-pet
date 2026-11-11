@@ -129,12 +129,16 @@ class Pet(PetRenderer,QWidget):
         self.rate_client=RateClient(self.options['deepseek_executable'],self.options['deepseek_home']); self.worker=BridgeWorker(); self.stop_event=threading.Event(); self.refresh_event=threading.Event()
         from .quota_refresh import QuotaRefresh
         self.quota_refresh=QuotaRefresh(self.refresh_event)
+        from .turn_cost import TurnCost
+        self.turn_cost=TurnCost(self.refresh_quota_quietly); self.cost_queue=[]; self.cost_text=''; self.cost_until=0
         self.worker.quota_read.connect(self.on_quota_read)
         from .client_lifetime import ClientLifetime
         self.client_lifetime=ClientLifetime()
         self.worker.client_exited.connect(self.on_client_exit)
         self.voice=VoicePlayer(ROOT,self); self.preview_audio_clip=None
         self.bubble_window=SpeechBubble(self); self.voice.changed.connect(self.on_voice_changed)
+        from .cost_float import CostFloat
+        self.cost_float=CostFloat(self)
         self.worker.status.connect(self.on_status); self.worker.quota.connect(self.on_quota); self.worker.threads.connect(self.on_threads)
         self.drag_offset=None; self.drag_origin=None; self.dragged=False
         self.hovered=False; self.ignore_release=False
@@ -252,6 +256,10 @@ class Pet(PetRenderer,QWidget):
         self.quota_refresh.request((self.options['deepseek_executable'],self.options['deepseek_home']))
         self.update()
 
+    def refresh_quota_quietly(self):
+        # Turn tracking must not make the balance box flicker on every task.
+        self.quota_refresh.request(self.options['deepseek_home'],silent=True)
+
     def quota_display_label(self):
         return self.quota_refresh.label() or self.quota_label(compact=True)
 
@@ -289,6 +297,7 @@ class Pet(PetRenderer,QWidget):
         if 'events' in status and state in ('done','error','paused'): state='idle'
         key=(status.get('thread_id'),state,status.get('started'),status.get('ended'))
         self.controller.set_live(state,key,time.monotonic()); self.tick(); self.update_layout()
+        self.observe_turn_cost(status)
         if changed:
             self.bubble_until=time.monotonic()+(20 if status.get('state') in ('done','error','waiting') else 10)
         if self.panel: self.panel.refresh()
@@ -336,6 +345,7 @@ class Pet(PetRenderer,QWidget):
             self.controller.enter(state,now,'notification')
             self.bubble_until=self.notification_until
         if not self.notification: self.controller.tick(now)
+        self.present_turn_cost(now)
         entered=self.controller.serial!=self.last_serial
         if entered:
             self.last_serial=self.controller.serial; self.state=self.controller.state; self.anim_start=self.controller.started
@@ -353,6 +363,28 @@ class Pet(PetRenderer,QWidget):
         self.update_bubble()
         self.update()
 
+    def observe_turn_cost(self,status):
+        if self.options['turn_cost_style']=='off':return
+        others=max(0,sum(1 for row in self.monitor.last.get('sessions',[]) if row.get('active'))-1)
+        report=self.turn_cost.observe(status,self.quota_data,others)
+        if report:self.show_turn_cost(report)
+
+    def show_turn_cost(self,report):
+        from .turn_cost import bubble_text,money
+        style=self.options['turn_cost_style']
+        if style in ('float','both') and self.isVisible():
+            rect=self.quota_rect if self.options['show_quota'] else self.pet_rect
+            point=QPoint(round(rect.center().x()*self.scale_factor),round(rect.top()*self.scale_factor))
+            self.cost_float.play('-'+money(report),self.mapToGlobal(point))
+        if style in ('bubble','both'):self.cost_queue.append(bubble_text(report))
+
+    def present_turn_cost(self,now):
+        if self.cost_text and now>=self.cost_until:
+            self.cost_text='';self.update_layout()
+        # Wait for the completion line so the cost never covers a subtitle.
+        if self.cost_queue and not self.cost_text and not self.notification and not self.voice.busy and self.controller.owner!='preview':
+            self.cost_text=self.cost_queue.pop(0);self.cost_until=now+8;self.update_layout()
+
     def quota_label(self,compact=False):
         from .bridge import balance_label
         return balance_label(self.quota_data,compact)
@@ -364,6 +396,7 @@ class Pet(PetRenderer,QWidget):
     def bubble_text(self):
         if hasattr(self,'bubble_window') and self.bubble_window.edge_resize.active: return self.bubble_window.edge_resize.text
         if self.presentation_previews: return '这是气泡宽度预览。\n拖动左右边缘试试看，长台词会自动换行。'
+        if self.cost_text: return self.cost_text
         b=self.binding(self.state)
         if self.voice_bubble():
             paired=clip_bubble_text(self.voice.selected_clip)

@@ -32,3 +32,13 @@ class RefreshTests(unittest.TestCase):
             self.assertEqual(f.label(),'刷新失败')
             self.now+=2.6;self.assertEqual(f.label(),'')
         f.request();self.assertEqual(f.label(),'刷新中…');self.assertTrue(self.event.is_set())
+
+
+class QuietRefreshTests(unittest.TestCase):
+    def test_quiet_refresh_shows_no_feedback(self):
+        now=[10.];f=QuotaRefresh(threading.Event(),lambda:now[0]);f.request(silent=True)
+        self.assertEqual(f.label(),'');ticket=f.begin_read();f.finish(ticket,dict(error='x'));self.assertEqual(f.label(),'')
+
+    def test_click_during_quiet_refresh_shows_feedback(self):
+        f=QuotaRefresh(threading.Event(),lambda:10.);f.request(silent=True);f.request()
+        self.assertEqual(f.label(),'刷新中…')
