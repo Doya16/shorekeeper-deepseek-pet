@@ -10,22 +10,23 @@ from .paths import VERSION,AUDIO_SESSION_NAME
 from .presentation_size import PresentationControl
 from .settings_layout import Page,WheelGuard,widen
 from .order_list import OrderList
+from .previews import CardPreview
 
 class Jobs(QObject):
     finished=Signal(str); failed=Signal(str)
 
 class Preferences(QDialog):
     def __init__(self,pet,catalog,assets,root):
-        super().__init__(None); self.pet=pet; self.loading=True; self.controls={}; self.buttons=[]
-        self.setWindowTitle(AUDIO_SESSION_NAME+' · 设置'); self.setWindowIcon(pet.icon); self.resize(980,760); self.setMinimumSize(760,560)
+        super().__init__(None); self.pet=pet; self.loading=True; self.controls={}; self.buttons=[]; self.previews={}
+        self.setWindowTitle(AUDIO_SESSION_NAME+' · 设置'); self.setWindowIcon(pet.icon); self.resize(1040,780); self.setMinimumSize(760,560)
         layout=QVBoxLayout(self); layout.setContentsMargins(20,18,20,18)
         title=QLabel('把陪伴调整成你喜欢的样子'); title.setObjectName('settingsTitle'); layout.addWidget(title)
         self.tabs=QTabWidget(); layout.addWidget(self.tabs,1)
         visual=self.tab('字体与大小')
-        visual.section('整体大小')
+        visual.section('整体大小',self.preview('size'))
         self.size_control=SizeControl(pet); self.size_control.setMaximumWidth(620); visual.addRow(self.size_control)
         visual.addRow('角色基础大小（100%）',self.spin('pet_size',140,420,' px'))
-        visual.section('字体与字号')
+        visual.section('字体与字号',self.preview('fonts'))
         names=list(dict.fromkeys(pet.font_families+['Microsoft YaHei','Segoe UI']+QFontDatabase.families()))
         visual.addRow('面板与额度字体',self.combo('font_family',names))
         visual.addRow('默认气泡字体',self.combo('bubble_font_family',names))
@@ -34,7 +35,7 @@ class Preferences(QDialog):
         visual.addRow('设置面板文字',self.spin('ui_font_size',13,28,' px'))
         add=QPushButton('添加本地字体文件…'); add.clicked.connect(self.add_font); visual.addRow(add)
         note=QLabel('已内置站酷快乐体与霞鹜文楷，随迁移包携带，无需安装到系统。单个状态也可以单独设置字体与字号。'); note.setWordWrap(True); visual.addRow(note)
-        visual.section('气泡与余额框 · 实时预览')
+        visual.section('气泡与余额框 · 实时预览',self.preview('bubble'))
         self.presentation_control=PresentationControl(pet); self.presentation_control.setMaximumWidth(620); visual.addRow(self.presentation_control)
         from .studio import BindingEditor
         self.editor=BindingEditor(pet,catalog,assets,root,parent=self.tabs)
@@ -42,7 +43,7 @@ class Preferences(QDialog):
         studio=QScrollArea(); studio.setWidgetResizable(True); studio.setFrameShape(QScrollArea.Shape.NoFrame); studio.setWidget(self.editor)
         self.editor.gallery.setMinimumHeight(440); self.tabs.addTab(studio,'交互工作室')
         voice=self.tab('桌面与声音')
-        voice.section('完成播报')
+        voice.section('完成播报',self.preview('finish'))
         turn_cost=QComboBox()
         for label,value in (('飘字','float'),('气泡','bubble'),('飘字和气泡','both'),('关闭','off')):turn_cost.addItem(label,value)
         turn_cost.currentIndexChanged.connect(lambda:self.change('turn_cost_style',turn_cost.currentData()));self.controls['turn_cost_style']=turn_cost;voice.addRow('播报方式',turn_cost)
@@ -54,30 +55,31 @@ class Preferences(QDialog):
         for label,value in (('细描边','thin'),('粗描边','thick'),('无描边','none')):outline.addItem(label,value)
         outline.currentIndexChanged.connect(lambda:self.change('turn_cost_outline',outline.currentData()));self.controls['turn_cost_outline']=outline;voice.addRow('飘字描边',outline)
         anchor=QComboBox()
-        for label,value in (('底部居中','bottom'),('顶部居中（从桌宠内开始）','inside'),('顶部居中（从桌宠上方开始）','above')):anchor.addItem(label,value)
+        for label,value in (('底部居中','bottom'),('顶部居中 · 桌宠内','inside'),('顶部居中 · 桌宠上方','above')):anchor.addItem(label,value)
         anchor.activated.connect(lambda:pet.set_cost_float_anchor(anchor.currentData()));self.controls['turn_cost_anchor']=anchor;voice.addRow('飘字起点',anchor)
         cost_place=QHBoxLayout();cost_move=QPushButton('拖动微调位置');cost_move.clicked.connect(pet.toggle_cost_float_placer);cost_reset=QPushButton('回到预设位置');cost_reset.clicked.connect(lambda:pet.set_cost_float_offset(0,0));cost_place.addWidget(cost_move);cost_place.addWidget(cost_reset);voice.addRow('飘字位置',cost_place)
         cost_note=QLabel('金额按本轮 token 用量和 DeepSeek 官方价格估算，含子代理和联网搜索，按北京时间区分高峰和空闲价格，法定节假日按工作日价格算，可能略高。连接插件较旧时改用前后余额差，飘字最多等 5 秒，超时不显示；在“连接 DeepSeek”页重新安装连接插件即可改用估算。选择起点会清除拖动微调；微调最多偏离起点 400 像素，靠近屏幕边缘时会自动收回。');cost_note.setWordWrap(True);voice.addRow(cost_note)
-        voice.section('桌面')
+        voice.section('桌面',self.preview('desk'))
         icon_style=QComboBox();icon_style.addItem('APP 小标','badged');icon_style.addItem('纯净图标','clean')
         icon_style.currentIndexChanged.connect(lambda:self.change('tray_icon_style',icon_style.currentData()));self.controls['tray_icon_style']=icon_style;voice.addRow('底部栏与托盘图标',icon_style)
         self.pack=QComboBox(); self.pack.addItem('163 · 小小守岸人','163'); self.pack.addItem('GB0227 · 近景表情','GB0227'); self.pack.currentIndexChanged.connect(lambda:pet.set_pack(self.pack.currentData()) if not self.loading else None); voice.addRow('默认表情风格',self.pack)
         self.top=QCheckBox('保持置顶'); self.top.toggled.connect(lambda value:pet.set_top(value) if not self.loading else None); voice.addRow(self.top)
         for key,label in (('edge_dock','拖到屏幕边缘时贴边藏起'),('daily_recap','每天显示一次小结'),('fullscreen_hide','全屏程序运行时隐藏')):
             box=QCheckBox(label); box.toggled.connect(lambda value,key=key:self.change(key,value)); self.controls[key]=box; voice.addRow(box)
-        dock_note=QLabel('把桌宠拖到屏幕左右边缘松手，会藏起一半；鼠标移上去或有提醒时探出来。小结也可以从右键菜单“今日小结”随时查看。'); voice.addRow(dock_note)
+        voice.addRow('贴边后多久藏起',self.spin('dock_tuck_seconds',10,600,' 秒'))
+        dock_note=QLabel('把桌宠拖到屏幕左右边缘松手，它会先靠边待机，安静到设定时间后藏起一半；有任务进行、有提醒、鼠标移上去或你离开电脑 5 分钟以上时会出来。小结也可以从右键菜单“今日小结”随时查看。'); voice.addRow(dock_note)
         self.notes=QCheckBox('气泡显示已公开的任务进度'); self.notes.toggled.connect(lambda value:pet.set_notes(value) if not self.loading else None); voice.addRow(self.notes)
-        voice.section('休息提醒')
+        voice.section('休息提醒',self.preview('rest'))
         rest=QCheckBox('开启喝水和久坐提醒'); rest.toggled.connect(lambda value:self.change('rest_reminder',value)); self.controls['rest_reminder']=rest; voice.addRow(rest)
         voice.addRow('提醒间隔',self.spin('rest_interval_minutes',15,240,' 分钟'))
         rest_note=QLabel('连续使用电脑到设定时间后，守岸人递上一杯奶茶，提醒卡片停留 10 秒。可以选择 30 分钟后再提醒、知道了，或关闭提醒。离开电脑 5 分钟以上会重新计时。'); voice.addRow(rest_note)
-        voice.section('锁定')
+        voice.section('锁定',self.preview('lock'))
         locked=QCheckBox('锁定桌宠'); locked.toggled.connect(lambda value:self.change('interaction_locked',value)); self.controls['interaction_locked']=locked; voice.addRow(locked)
         voice.addRow('锁定悬停透明度',self.spin('locked_hover_transparency',0,95,' %'))
         voice.addRow('锁按钮大小',self.spin('lock_button_size',50,200,' %'))
         voice.addRow('锁按钮透明度',self.spin('lock_button_transparency',0,90,' %'))
         tip=QLabel('静音立即停止声音并暂停后续播报与试听，取消后恢复原音量。锁定后，角色区域的点击会穿透到下方窗口，鼠标移入时淡化；任务状态与完成提醒继续。小锁仍可解锁，余额框仍可点击刷新。也可从托盘打开设置解锁。'); tip.setWordWrap(True); voice.addRow(tip)
-        voice.section('声音')
+        voice.section('声音',self.preview('sound'))
         muted=QCheckBox('安静陪伴（静音）'); muted.toggled.connect(lambda value:self.change('audio_muted',value)); self.controls['audio_muted']=muted; voice.addRow(muted)
         enabled=QCheckBox('开启本地语音提醒'); enabled.toggled.connect(lambda v:self.change('audio_enabled',v)); self.controls['audio_enabled']=enabled; voice.addRow(enabled)
         voice.addRow('音量',self.spin('volume',0,100,' %'))
@@ -137,6 +139,8 @@ class Preferences(QDialog):
     def showEvent(self,event):
         # Start on the tab bar, never inside a choice the keyboard or wheel could change by accident.
         super().showEvent(event); self.tabs.tabBar().setFocus()
+    def preview(self,mode):
+        view=CardPreview(self.pet,mode); self.previews[mode]=view; return view
     def select_page(self,title):
         for index in range(self.tabs.count()):
             if self.tabs.tabText(index)==title: self.tabs.setCurrentIndex(index); break

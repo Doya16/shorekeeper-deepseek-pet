@@ -2,13 +2,13 @@
 import datetime,pathlib,tempfile,time,unittest
 from decimal import Decimal
 from unittest.mock import patch
-from PySide6.QtCore import QEvent,QPoint,QPointF,Qt
+from PySide6.QtCore import QEvent,QPoint,QPointF,QRect,Qt
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QApplication
 from shorekeeper_pet import pet as module
 from shorekeeper_pet.config_io import save_atomic
 from shorekeeper_pet.daily_recap import DailyStats,duration_text
-from shorekeeper_pet.edge_dock import VISIBLE,WALL_SHOWN,wall_fraction
+from shorekeeper_pet.edge_dock import VISIBLE,WALL_SHOWN,EdgeDock,wall_fraction
 from PySide6.QtGui import QColor,QImage
 
 USAGE=dict(tokens=[dict(provider='deepseek-account',model='deepseek-flash',hour=0,hit=0,miss=0,out=1_000_000)],search=0,fetch=0)
@@ -95,16 +95,30 @@ class ConfettiTests(Base):
 
 
 class EdgeDockTests(Base):
+    def setUp(self):
+        super().setUp();self.now=[100.];self.idle=[0.];d=self.pet.edge_dock;d.clock=lambda:self.now[0];d.idle=lambda:self.idle[0]
+
     def drag_to(self,x,y):
         p=self.pet;p.drag_offset=QPoint(10,10);p.drag_origin=QPoint(0,0);p.dragged=True;p.move(x,y)
         local=QPointF(10,10)
         p.mouseReleaseEvent(QMouseEvent(QEvent.Type.MouseButtonRelease,local,local+QPointF(p.pos()),Qt.MouseButton.LeftButton,Qt.MouseButton.NoButton,Qt.KeyboardModifier.NoModifier))
-        p.edge_dock.animation.stop();p.move(p.edge_dock.target(p.edge_dock.tucked)) if p.edge_dock.docked else None
+        self.land()
+
+    def land(self):
+        d=self.pet.edge_dock;d.animation.stop()
+        if d.docked:self.pet.move(d.target(d.tucked))
+
+    def wait(self,seconds):
+        """Seconds of quiet pass, one update a second as on the real pet."""
+        for _ in range(int(seconds)):self.now[0]+=1;self.pet.edge_dock.update();self.land()
 
     def shown(self):
         """Width of the pet square left on screen: up to the cut through the art."""
         d=self.pet.edge_dock;r=self.pet.pet_rect;s=self.pet.scale_factor
         return (d.cut()-r.left())*s if d.side=='right' else (r.left()+r.width()-d.cut())*s
+
+    def right_edge(self):
+        area=self.pet.screen_area();self.drag_to(area.right()-self.pet.width()//2,300);return area
 
     def test_default_peek_art_keeps_a_strip_of_wall(self):
         art=self.pet.get_animation(self.pet.binding('hover')['asset']).frames[0]
@@ -117,56 +131,88 @@ class EdgeDockTests(Base):
             for y in range(100):walled.setPixelColor(x,y,QColor(140,130,130))
         self.assertAlmostEqual(wall_fraction(walled),.7+WALL_SHOWN,delta=.001)
 
-    def test_left_edge_mirrors_only_the_peeking_art(self):
-        area=self.pet.screen_area();self.drag_to(area.left()-self.pet.width()//2,300)
-        self.pet.controller.enter('idle',time.monotonic(),'live');self.pet.tick()
-        self.assertTrue(self.pet.mirror_art);self.pet.grab()
-        self.pet.react('pet');self.assertFalse(self.pet.mirror_art)
-        self.pet.edge_dock.side='right';self.pet.controller.enter('idle',time.monotonic(),'live');self.pet.tick();self.assertFalse(self.pet.mirror_art)
-
-    def test_release_at_the_right_edge_tucks_half_away(self):
-        area=self.pet.screen_area();self.drag_to(area.right()-self.pet.width()//2,300)
-        dock=self.pet.edge_dock;self.assertTrue(dock.docked and dock.tucked);g=dock.pet_global()
-        self.assertAlmostEqual(area.right()+1-g.left(),self.shown(),delta=2)
+    def test_release_at_the_edge_waits_in_full_view_then_tucks_after_the_quiet_delay(self):
+        area=self.right_edge();d=self.pet.edge_dock
+        self.assertTrue(d.docked);self.assertFalse(d.tucked);g=d.pet_global();self.assertLessEqual(g.right(),area.right())
         self.assertEqual(module.load_settings()['dock'],dict(side='right'))
+        self.wait(59);self.assertFalse(d.tucked)
+        self.wait(2);self.assertTrue(d.tucked);g=d.pet_global()
+        self.assertAlmostEqual(area.right()+1-g.left(),self.shown(),delta=2)
 
-    def test_left_edge_too(self):
-        area=self.pet.screen_area();self.drag_to(area.left()-self.pet.width()//2,300)
-        g=self.pet.edge_dock.pet_global();self.assertEqual(self.pet.edge_dock.side,'left')
-        self.assertAlmostEqual(g.right()+1-area.left(),self.shown(),delta=2)
+    def test_quiet_waiting_keeps_the_idle_art_and_tucked_uses_the_peek_art(self):
+        self.right_edge();self.pet.controller.enter('idle',time.monotonic(),'live');self.pet.tick()
+        self.assertEqual(self.pet.animation_id,self.pet.binding('idle')['asset'])
+        self.wait(61);self.pet.tick();self.assertEqual(self.pet.animation_id,self.pet.binding('hover')['asset'])
+
+    def test_left_edge_tucks_mirrored_and_out_is_not_mirrored(self):
+        area=self.pet.screen_area();self.drag_to(area.left()-self.pet.width()//2,300);d=self.pet.edge_dock
+        self.pet.controller.enter('idle',time.monotonic(),'live');self.pet.tick();self.assertFalse(self.pet.mirror_art)
+        self.wait(61);self.pet.tick();self.assertEqual(d.side,'left');self.assertTrue(self.pet.mirror_art)
+        g=d.pet_global();self.assertAlmostEqual(g.right()+1-area.left(),self.shown(),delta=2);self.pet.grab()
+        self.pet.react('pet');self.assertFalse(self.pet.mirror_art)
+
+    def test_a_running_task_comes_out_at_once_and_stays_out(self):
+        self.right_edge();d=self.pet.edge_dock;self.wait(61);self.assertTrue(d.tucked)
+        self.pet.on_status(dict(state='thinking',message='',title='t',thread_id='a',turn_id='1',stale=False,active=True,started=time.time(),events=[]))
+        self.land();self.assertFalse(d.tucked)
+        self.wait(300);self.assertFalse(d.tucked)
+        self.pet.on_status(dict(state='idle',message='',title='',thread_id='',turn_id='',stale=False,active=False,events=[]))
+        self.wait(59);self.assertFalse(d.tucked);self.wait(2);self.assertTrue(d.tucked)
+
+    def test_working_poses_are_never_cut(self):
+        self.right_edge();self.wait(61)
+        self.pet.on_status(dict(state='writing',message='',title='t',thread_id='a',turn_id='1',stale=False,active=True,started=time.time(),events=[]))
+        self.land();self.assertTrue(self.pet.screen_area().contains(self.pet.edge_dock.pet_global()))
+
+    def test_a_completion_comes_out(self):
+        self.right_edge();self.wait(61);self.finish();self.land()
+        self.assertFalse(self.pet.edge_dock.tucked)
+
+    def test_a_pointer_peek_slides_back_soon(self):
+        self.right_edge();d=self.pet.edge_dock;self.wait(61)
+        d.hover_in();self.land();self.assertFalse(d.tucked);self.assertTrue(d.peeking);self.assertTrue(d.showing_peek_art())
+        with patch.object(self.pet,'underMouse',return_value=False):d.peek_over()
+        self.land();self.assertTrue(d.tucked)
+
+    def test_comes_out_while_the_user_is_away_and_tucks_after_they_return(self):
+        self.right_edge();d=self.pet.edge_dock;self.wait(61);self.assertTrue(d.tucked)
+        self.idle[0]=400;self.wait(1);self.assertFalse(d.tucked)
+        self.idle[0]=0;self.wait(59);self.assertFalse(d.tucked);self.wait(2);self.assertTrue(d.tucked)
+
+    def test_the_delay_comes_from_the_settings(self):
+        self.pet.set_option('dock_tuck_seconds',10);self.right_edge();d=self.pet.edge_dock
+        self.wait(9);self.assertFalse(d.tucked);self.wait(2);self.assertTrue(d.tucked)
+        self.assertEqual(module.appearance(dict(appearance=dict(dock_tuck_seconds=5)))['dock_tuck_seconds'],10)
 
     def test_release_away_from_edges_does_not_dock(self):
         area=self.pet.screen_area();self.drag_to(area.center().x()-200,300)
         self.assertFalse(self.pet.edge_dock.docked);self.assertIsNone(module.load_settings()['dock'])
 
-    def test_tucked_pet_rests_with_the_hover_art(self):
-        area=self.pet.screen_area();self.drag_to(area.right(),300);self.pet.controller.enter('idle',time.monotonic(),'live');self.pet.tick()
-        self.assertEqual(self.pet.animation_id,self.pet.binding('hover')['asset'])
-        self.pet.edge_dock.undock();self.pet.tick();self.assertEqual(self.pet.animation_id,self.pet.binding('idle')['asset'])
-
-    def test_slides_out_for_the_pointer_and_back(self):
-        area=self.pet.screen_area();self.drag_to(area.right(),300);dock=self.pet.edge_dock
-        dock.reveal();dock.animation.stop();self.pet.move(dock.target(False))
-        g=dock.pet_global();self.assertLessEqual(g.right(),area.right())
-        with patch.object(dock,'busy',return_value=False):dock.tuck_if_idle()
-        self.assertTrue(dock.tucked)
-
-    def test_slides_out_for_a_completion(self):
-        area=self.pet.screen_area();self.drag_to(area.right(),300);self.finish()
-        self.assertFalse(self.pet.edge_dock.tucked)
+    def test_a_neighbouring_monitor_blocks_that_edge(self):
+        class Screen:
+            def __init__(self,*rect):self.rect=QRect(*rect)
+            def geometry(self):return self.rect
+        main=QRect(0,0,1707,1000)
+        # Mixed scaling: the right-hand monitor starts at 2560 while the first ends at 1707.
+        screens=[Screen(0,0,1707,1040),Screen(2560,0,1920,1080)]
+        self.assertFalse(EdgeDock.outer(main,'right',screens));self.assertTrue(EdgeDock.outer(main,'left',screens))
+        touching=[Screen(0,0,1707,1040),Screen(-1920,200,1920,1080)]
+        self.assertFalse(EdgeDock.outer(main,'left',touching));self.assertTrue(EdgeDock.outer(main,'right',touching))
+        above=[Screen(0,0,1707,1040),Screen(1800,-1200,1920,1080)]
+        self.assertTrue(EdgeDock.outer(main,'right',above))
 
     def test_turning_the_option_off_brings_it_back(self):
-        area=self.pet.screen_area();self.drag_to(area.right(),300);self.pet.set_option('edge_dock',False)
+        area=self.right_edge();self.wait(61);self.pet.set_option('edge_dock',False)
         self.assertFalse(self.pet.edge_dock.docked);self.assertTrue(area.contains(self.pet.geometry()))
 
-    def test_dock_survives_a_restart(self):
-        area=self.pet.screen_area();self.drag_to(area.right(),300);self.pet.hide()
+    def test_dock_survives_a_restart_tucked(self):
+        self.right_edge();self.pet.hide()
         again=module.Pet(offline=True);again.timer.stop();again.slow_timer.stop()
         try:self.assertEqual(again.edge_dock.side,'right');self.assertTrue(again.edge_dock.tucked)
         finally:again.hide()
 
     def test_scale_change_keeps_it_docked(self):
-        area=self.pet.screen_area();self.drag_to(area.right(),300);self.pet.set_scale(1.3)
+        area=self.right_edge();self.wait(61);self.pet.set_scale(1.3)
         g=self.pet.edge_dock.pet_global();self.assertAlmostEqual(area.right()+1-g.left(),self.shown(),delta=2)
 
 

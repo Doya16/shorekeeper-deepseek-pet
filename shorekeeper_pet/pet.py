@@ -315,6 +315,8 @@ class Pet(PetRenderer,QWidget):
         if 'events' in status and state in ('done','error','paused'): state='idle'
         key=(status.get('thread_id'),state,status.get('started'),status.get('ended'))
         self.observe_turn_cost(status)
+        # A task at work comes out from the edge at once, so every working pose is seen whole.
+        if status.get('active') and not status.get('stale'): self.edge_dock.reveal()
         # Keep the working animation while the completion waits for its amount.
         if time.monotonic()>=self.cost_hold_until: self.controller.set_live(state,key,time.monotonic())
         self.tick(); self.update_layout()
@@ -379,7 +381,7 @@ class Pet(PetRenderer,QWidget):
         # one shown when the pointer is over the pet, flipped on the left edge.
         art=self.state
         if self.state=='idle' and self.rest_reminder.active: art='feed'
-        elif self.state=='idle' and self.edge_dock.docked: art='hover'
+        elif self.state=='idle' and self.edge_dock.showing_peek_art(): art='hover'
         aid=self.preview_id or self.binding(art)['asset']
         self.mirror_art=not self.preview_id and self.edge_dock.mirrored(aid)
         self.switch_animation(aid)
@@ -453,7 +455,7 @@ class Pet(PetRenderer,QWidget):
         if lines:self.cost_float.play(lines)
 
     def slow_tick(self):
-        self.fullscreen_guard.check();self.rest_reminder.check();self.slow_count+=1
+        self.fullscreen_guard.check();self.rest_reminder.check();self.edge_dock.update();self.slow_count+=1
         if not self.offline and self.slow_count%60==15:self.show_due_recap()
 
     def show_due_recap(self):
@@ -591,7 +593,7 @@ class Pet(PetRenderer,QWidget):
             self.ignore_release=False; self.drag_offset=None; return
         if self.dragged:
             area=(QApplication.screenAt(QCursor.pos()) or self.screen()).availableGeometry()
-            if self.edge_dock.try_dock(area): target=self.edge_dock.target(True); self.settings['position']=[target.x(),target.y()]
+            if self.edge_dock.try_dock(area): target=self.edge_dock.target(False); self.settings['position']=[target.x(),target.y()]
             else: self.clamp_position(); self.settings['position']=[self.x(),self.y()]
             self.settings['dock']=self.edge_dock.state(); self.save_settings()
             self.react('drop')
@@ -618,7 +620,7 @@ class Pet(PetRenderer,QWidget):
         self.lock_button.refresh_visibility()
         self.update_quota_cursor()
         if not self.locked: self.hover_timer.start(1000)
-        self.edge_dock.reveal()
+        self.edge_dock.hover_in()
         super().enterEvent(event)
 
     def leaveEvent(self,event):
@@ -626,7 +628,7 @@ class Pet(PetRenderer,QWidget):
         self.unsetCursor()
         self.hover_timer.stop(); self.hovered=False
         if self.override=='hover': self.clear_override()
-        self.edge_dock.tuck_later()
+        self.edge_dock.hover_out()
         super().leaveEvent(event)
 
     def hover_react(self):

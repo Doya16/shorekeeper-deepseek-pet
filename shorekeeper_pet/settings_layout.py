@@ -40,15 +40,21 @@ def button_row(layout):
 
 
 class Section(QFrame):
-    def __init__(self,title=''):
-        super().__init__();self.setObjectName('settingsCard')
+    def __init__(self,title='',preview=None):
+        super().__init__();self.setObjectName('settingsCard');self.preview=preview
         outer=QVBoxLayout(self);outer.setContentsMargins(16,12,16,14);outer.setSpacing(8)
         if title:
             head=QLabel(title);head.setObjectName('settingsSection');outer.addWidget(head)
         self.grid=QGridLayout();self.grid.setHorizontalSpacing(12);self.grid.setVerticalSpacing(10)
-        self.grid.setColumnMinimumWidth(2,GAP);self.grid.setColumnStretch(5,1)
-        for column in (0,3):self.grid.setColumnMinimumWidth(column,LABEL_WIDTH)
-        outer.addLayout(self.grid);self.row=0;self.slot=0;self.buttons=None
+        self.grid.setColumnStretch(5,1);self.grid.setColumnMinimumWidth(2,GAP)
+        if preview is None:
+            for column in (0,3):self.grid.setColumnMinimumWidth(column,LABEL_WIDTH)
+            outer.addLayout(self.grid)
+        else:
+            # The preview sits on the right; labels size to their text so two settings still fit per row.
+            self.grid.setHorizontalSpacing(10);self.grid.setColumnMinimumWidth(2,18)
+            body=QHBoxLayout();body.setSpacing(18);body.addLayout(self.grid,1);body.addWidget(preview,0,Qt.AlignmentFlag.AlignTop);outer.addLayout(body)
+        self.row=0;self.slot=0;self.buttons=None
 
     def next_row(self):
         if self.slot:self.row+=1;self.slot=0
@@ -107,8 +113,8 @@ class Page:
         self.layout.setContentsMargins(4,10,8,10);self.layout.setSpacing(12);self.layout.addStretch(1)
         self.scroll.setWidget(body);self.current=None
 
-    def section(self,title=''):
-        self.current=Section(title);self.layout.insertWidget(self.layout.count()-1,self.current);return self.current
+    def section(self,title='',preview=None):
+        self.current=Section(title,preview);self.layout.insertWidget(self.layout.count()-1,self.current);return self.current
 
     def addRow(self,first,second=None):
         (self.current or self.section()).addRow(first,second)
