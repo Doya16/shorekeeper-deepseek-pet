@@ -87,6 +87,45 @@ class SettingsLayoutTests(unittest.TestCase):
             for button in page.widget().findChildren(QPushButton):
                 self.assertLess(button.width(),400,(self.d.tabs.tabText(index),button.text(),button.width()))
 
+    def pages(self):
+        return [self.d.tabs.widget(i) for i in range(self.d.tabs.count()) if isinstance(self.d.tabs.widget(i),QScrollArea)]
+
+    def test_every_page_and_preview_fits_the_default_window(self):
+        self.d.resize(1040,780);self.app.processEvents()
+        for index in range(self.d.tabs.count()):
+            self.d.tabs.setCurrentIndex(index);self.app.processEvents();page=self.d.tabs.widget(index)
+            if not isinstance(page,QScrollArea):continue
+            self.assertLessEqual(page.widget().minimumSizeHint().width(),page.viewport().width(),self.d.tabs.tabText(index))
+            for view in self.d.previews.values():
+                if page.widget().isAncestorOf(view):
+                    right=view.mapTo(page.viewport(),QPoint(view.width(),0)).x()
+                    self.assertLessEqual(right,page.viewport().width(),(self.d.tabs.tabText(index),view.mode))
+
+    def test_font_lists_keep_a_set_width_and_a_row_of_their_own(self):
+        for key in ('font_family','bubble_font_family','turn_cost_font_family'):
+            combo=self.d.controls[key]
+            self.assertEqual(combo.sizeAdjustPolicy(),QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon,key)
+            self.assertLessEqual(combo.minimumWidth(),COMBO_WIDTH[1],key)
+            # Alone on its row: nothing else in the card's grid shares the row.
+            grid=combo.parentWidget().grid;row=grid.getItemPosition(grid.indexOf(combo))[0]
+            shared=[grid.itemAt(i).widget() for i in range(grid.count()) if grid.getItemPosition(i)[0]==row]
+            self.assertFalse([w for w in shared if w is not combo and isinstance(w,(QComboBox,QAbstractSpinBox))],key)
+
+    def test_window_grows_within_its_screen_to_show_a_wide_page(self):
+        from PySide6.QtWidgets import QWidget
+        if self.d.screen().availableGeometry().width()<1100:self.skipTest('screen too narrow to grow the window')
+        self.d.select_page('字体与大小');self.d.resize(900,600);self.app.processEvents()
+        page=self.d.tabs.currentWidget();wide=QWidget();wide.setMinimumWidth(page.viewport().width()+150)
+        page.widget().layout().insertWidget(0,wide);self.app.processEvents()
+        self.d.fit_pages();self.app.processEvents()
+        screen=self.d.screen().availableGeometry()
+        self.assertGreater(self.d.width(),900)
+        self.assertLessEqual(self.d.frameGeometry().width(),screen.width())
+        if self.d.frameGeometry().width()<screen.width():
+            self.assertLessEqual(page.widget().minimumSizeHint().width(),page.viewport().width())
+        before=self.d.width();wide.setMinimumWidth(10);self.app.processEvents();self.d.fit_pages()
+        self.assertEqual(self.d.width(),before)  # never shrinks a window
+
     def test_every_setting_is_on_a_page(self):
         for key,control in self.d.controls.items():
             self.assertIsNotNone(control.parentWidget(),key)

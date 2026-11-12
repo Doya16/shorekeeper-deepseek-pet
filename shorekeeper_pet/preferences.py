@@ -1,14 +1,14 @@
 import copy,datetime,json,pathlib,shutil,threading
-from PySide6.QtCore import Qt,QObject,Signal
+from PySide6.QtCore import Qt,QObject,Signal,QTimer
 from PySide6.QtGui import QFontDatabase
-from PySide6.QtWidgets import QDialog,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QTabWidget,QScrollArea,QComboBox,QSpinBox,QCheckBox,QPushButton,QLineEdit,QFileDialog,QMessageBox
+from PySide6.QtWidgets import QApplication,QStyle,QDialog,QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QLabel,QTabWidget,QScrollArea,QComboBox,QSpinBox,QCheckBox,QPushButton,QLineEdit,QFileDialog,QMessageBox
 from .appearance import stylesheet,load_fonts
 from .config_io import export_bundle,import_bundle,save_atomic
 from .paths import ROOT,DSH_HOME
 from .sizing import SizeControl
 from .paths import VERSION,AUDIO_SESSION_NAME
 from .presentation_size import PresentationControl
-from .settings_layout import Page,WheelGuard,widen
+from .settings_layout import Page,WheelGuard,widen,long_list
 from .order_list import OrderList
 from .previews import CardPreview
 
@@ -139,7 +139,23 @@ class Preferences(QDialog):
         self.refresh_controls(); self.loading=False; self.apply_style()
     def showEvent(self,event):
         # Start on the tab bar, never inside a choice the keyboard or wheel could change by accident.
-        super().showEvent(event); self.tabs.tabBar().setFocus()
+        super().showEvent(event); self.tabs.tabBar().setFocus(); QTimer.singleShot(0,self.fit_pages)
+    def fit_pages(self):
+        """Grow the window, within its screen, until the widest page and every preview card are in view.
+        Never shrinks a window the user made larger."""
+        current=self.tabs.currentWidget()
+        if not self.isVisible() or not isinstance(current,QScrollArea): return
+        pages=[self.tabs.widget(i) for i in range(self.tabs.count())]
+        need=max((page.widget().minimumSizeHint().width() for page in pages if isinstance(page,QScrollArea) and page.widget()),default=0)
+        # Window edges, tabs and margins around the page, plus room for a page's own vertical scroll bar.
+        bar=0 if current.verticalScrollBar().isVisible() else self.style().pixelMetric(QStyle.PixelMetric.PM_ScrollBarExtent)
+        chrome=self.width()-current.viewport().width()+bar
+        screen=(self.screen() or QApplication.primaryScreen()).availableGeometry()
+        frame=self.frameGeometry().width()-self.width(); title=self.frameGeometry().height()-self.height()
+        width=max(self.width(),min(need+chrome,screen.width()-frame)); height=min(self.height(),screen.height()-title)
+        if (width,height)==(self.width(),self.height()): return
+        self.resize(width,height); g=self.frameGeometry()
+        self.move(max(screen.left(),min(g.left(),screen.right()+1-g.width())),max(screen.top(),min(g.top(),screen.bottom()+1-g.height())))
     def line_style(self,kind):
         """Bold and italic switches and a colour button for one floating-text line."""
         row=QHBoxLayout(); row.setSpacing(10)
@@ -181,7 +197,7 @@ class Preferences(QDialog):
     def combo(self,key,names):
         control=QComboBox()
         for name in names: control.addItem(name,name)
-        control.currentIndexChanged.connect(lambda:self.change(key,control.currentData())); self.controls[key]=control; return control
+        control.currentIndexChanged.connect(lambda:self.change(key,control.currentData())); self.controls[key]=control; return long_list(control)
     def spin(self,key,low,high,suffix):
         control=QSpinBox(); control.setRange(low,high); control.setSuffix(suffix); control.setKeyboardTracking(False); control.valueChanged.connect(lambda value:self.change(key,value)); self.controls[key]=control; return control
     def path_control(self,key,title,directory):
@@ -234,6 +250,8 @@ class Preferences(QDialog):
             +f'QLabel#settingsSection{{font-size:{size+1}px;font-weight:600;color:#2e5280;}}'
             +f'QLabel#settingsNote{{font-size:{max(12,size-3)}px;color:#6f819b;}}'
             +'QLabel#settingsLabel{color:#3d5573;}QFrame#settingsCard QPushButton{padding:6px 16px;}')
+        # A larger panel font widens the pages; keep every preview in view.
+        if self.isVisible(): QTimer.singleShot(0,self.fit_pages)
     def create_shortcut(self):
         from .shortcuts import create_desktop_shortcut
         self.set_busy(True);self.status.setText('正在创建桌面快捷方式…')

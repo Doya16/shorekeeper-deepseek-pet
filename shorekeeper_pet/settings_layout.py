@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (QAbstractScrollArea,QAbstractSlider,QAbstractSpin
 
 SPIN_WIDTH=(110,150)
 COMBO_WIDTH=(150,300)
+LONG_LIST_CHARS=16  # a font list shows about this many characters while closed
+LIST_WIDTH=480  # the opened font list grows to its longest name, up to this width
 GAP=28  # space between the two columns of a card
 LABEL_WIDTH=112  # labels line up across cards
 
@@ -18,9 +20,19 @@ def fit(widget):
     if isinstance(widget,QAbstractSpinBox):
         widget.setMinimumWidth(SPIN_WIDTH[0]);widget.setMaximumWidth(SPIN_WIDTH[1])
     elif isinstance(widget,QComboBox):
-        widget.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
+        if not widget.property('longList'):widget.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         widget.setMinimumWidth(COMBO_WIDTH[0]);widget.setMaximumWidth(COMBO_WIDTH[1])
     return widget
+
+
+def long_list(combo):
+    """A choice among every installed font. It keeps a set width, so one long family name cannot push the card's
+    preview off the page; the opened list is as wide as its longest name."""
+    combo.setProperty('longList',True)
+    combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon);combo.setMinimumContentsLength(LONG_LIST_CHARS)
+    combo.view().setMinimumWidth(min(LIST_WIDTH,combo.view().sizeHintForColumn(0)+40))
+    combo.setMinimumWidth(COMBO_WIDTH[0]);combo.setMaximumWidth(COMBO_WIDTH[1])
+    return combo
 
 
 def widen(combo):
@@ -29,7 +41,7 @@ def widen(combo):
 
 
 def short(widget):
-    return isinstance(widget,(QAbstractSpinBox,QComboBox,QCheckBox))
+    return isinstance(widget,(QAbstractSpinBox,QComboBox,QCheckBox)) and not widget.property('longList')
 
 
 def button_row(layout):
@@ -80,7 +92,8 @@ class Section(QFrame):
             self.grid.addWidget(self.label(text),self.row,0,Qt.AlignmentFlag.AlignVCenter)
             span=(self.row,1,1,5)
         else:span=(self.row,0,1,6)
-        (self.grid.addLayout if isinstance(item,QLayout) else self.grid.addWidget)(item,*span)
+        if isinstance(item,QComboBox):self.grid.addWidget(item,*span,Qt.AlignmentFlag.AlignLeft|Qt.AlignmentFlag.AlignVCenter)
+        else:(self.grid.addLayout if isinstance(item,QLayout) else self.grid.addWidget)(item,*span)
         self.row+=1
 
     def add_note(self,label):
