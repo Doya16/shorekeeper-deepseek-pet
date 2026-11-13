@@ -721,6 +721,7 @@ class Pet(PetRenderer,QWidget):
             self.edge_dock.undock(); self.clamp_position(); self.settings['dock']=None; self.settings['position']=[self.x(),self.y()]; self.save_settings()
         if key=='fullscreen_hide': self.fullscreen_guard.check()
         if key in ('rest_reminder','rest_interval_minutes'): self.rest_reminder.options_changed()
+        if key=='rest_snooze_minutes': self.rest_reminder.snooze_changed()
         if key in ('audio_muted','interaction_locked','fullscreen_hide','rest_reminder') and self.preferences: self.preferences.refresh_controls()
         if key.startswith('deepseek'): self.refresh_event.set()
         if key in ('check_updates_periodic','update_interval_hours','ignored_update_version','update_snoozed_date'):

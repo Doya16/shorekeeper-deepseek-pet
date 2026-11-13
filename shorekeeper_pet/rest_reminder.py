@@ -2,7 +2,8 @@
 
 Counts continuous time at the computer: being away for IDLE_RESET seconds starts the count again.
 When it is due the pet hands over a cup of milk tea (the "feed" animation) and shows a card for SHOW_SECONDS:
-remind me in 30 minutes, got it (next one after the usual interval), or switch reminders off.
+remind me later (after the minutes chosen in the settings, 30 by default), got it (next one after the usual
+interval), or switch reminders off.
 """
 import sys,time
 from PySide6.QtCore import Qt
@@ -11,7 +12,6 @@ from PySide6.QtWidgets import QApplication,QFrame,QLabel,QPushButton,QVBoxLayout
 from .appearance import stylesheet
 
 SHOW_SECONDS=10
-SNOOZE_MINUTES=30
 IDLE_RESET=300
 
 
@@ -25,6 +25,9 @@ def idle_seconds():
     info=LastInput();info.cbSize=ctypes.sizeof(LastInput)
     if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):return 0
     return max(0,(ctypes.windll.kernel32.GetTickCount()-info.dwTime)&0xFFFFFFFF)/1000
+
+
+def later_label(minutes):return f'{minutes} 分钟后再提醒'
 
 
 def message(minutes):
@@ -43,7 +46,7 @@ class ReminderCard(QFrame):
         box=QVBoxLayout(self);box.setContentsMargins(16,14,16,14);box.setSpacing(8)
         self.text=QLabel();self.text.setTextFormat(Qt.TextFormat.PlainText);self.text.setWordWrap(True);box.addWidget(self.text)
         self.buttons={}
-        for key,label,action in (('later','30 分钟后再提醒',reminder.later),('ok','知道了',reminder.acknowledge),('off','关闭提醒（可在设置里重新打开）',reminder.switch_off)):
+        for key,label,action in (('later',later_label(reminder.snooze_minutes()),reminder.later),('ok','知道了',reminder.acknowledge),('off','关闭提醒（可在设置里重新打开）',reminder.switch_off)):
             button=QPushButton(label);button.clicked.connect(action);box.addWidget(button);self.buttons[key]=button
 
     def paintEvent(self,event):
@@ -54,7 +57,7 @@ class ReminderCard(QFrame):
         p=self.pet;options=p.options;key=(options['font_family'],options['ui_font_size'])
         if key!=self.style_key:
             self.setStyleSheet(stylesheet(options));self.style_key=key
-        self.text.setText(text);self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint,p.on_top)
+        self.text.setText(text);self.buttons['later'].setText(later_label(self.reminder.snooze_minutes()));self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint,p.on_top)
         area=p.screen_area();self.setFixedWidth(min(area.width(),max(280,min(420,round(330*p.scale_factor)))));self.adjustSize()
         # Above the pet, like the speech bubble; below it when there is no room.
         rect=p.pet_rect;s=p.scale_factor;top=p.y()+round(rect.top()*s);centre=p.x()+round(rect.center().x()*s)
@@ -69,6 +72,8 @@ class RestReminder:
         self.since=clock();self.due=self.since+self.interval()
 
     def interval(self):return self.pet.options['rest_interval_minutes']*60
+
+    def snooze_minutes(self):return self.pet.options['rest_snooze_minutes']
 
     @property
     def active(self):return self.card is not None and self.card.isVisible()
@@ -102,7 +107,7 @@ class RestReminder:
         if self.card:self.card.hide()
         self.pet.edge_dock.tuck_later()
 
-    def later(self):self.close();self.restart(SNOOZE_MINUTES*60)
+    def later(self):self.close();self.restart(self.snooze_minutes()*60)
 
     def acknowledge(self):self.close();self.since=self.clock();self.restart()
 
@@ -113,3 +118,7 @@ class RestReminder:
         """A new interval, or switching back on, counts from now."""
         self.since=self.clock();self.restart()
         if not self.pet.options['rest_reminder'] and self.active:self.card.hide()
+
+    def snooze_changed(self):
+        """The button names the current choice, also on a card that is already showing; the count is not reset."""
+        if self.card:self.card.buttons['later'].setText(later_label(self.snooze_minutes()))

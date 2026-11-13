@@ -215,7 +215,7 @@ class CardPreview(QWidget):
         p.save();p.setPen(QPen(BUBBLE_EDGE,1.4));p.setBrush(QColor('#f4f9ff'));p.drawRoundedRect(card,10,10)
         f=font(o['font_family'],10);p.setFont(f);p.setPen(INK)
         p.drawText(card.adjusted(8,8,-8,-90),Qt.TextFlag.TextWordWrap,f"已经陪你坐了 {o['rest_interval_minutes']} 分钟。\n喝口水，伸个懒腰吧。")
-        for i,label in enumerate(('30 分钟后再提醒','知道了','关闭提醒')):
+        for i,label in enumerate((f"{o['rest_snooze_minutes']} 分钟后再提醒",'知道了','关闭提醒')):
             b=QRectF(card.left()+8,card.top()+58+i*26,card.width()-16,20);p.setPen(QPen(QColor('#b9cde4'),1));p.setBrush(QColor('#ffffff'));p.drawRoundedRect(b,5,5)
             p.setPen(INK);p.drawText(b,Qt.AlignmentFlag.AlignCenter,label)
         p.restore();self.caption(p,f"每 {o['rest_interval_minutes']} 分钟 · 卡片停留 10 秒")

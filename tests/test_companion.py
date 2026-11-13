@@ -345,8 +345,23 @@ class RestReminderTests(Base):
         self.advance(2);self.assertFalse(r.active);self.assertEqual(r.due,self.now[0]+3600)
 
     def test_later_waits_thirty_minutes(self):
-        r=self.pet.rest_reminder;self.advance(3601);r.card.buttons['later'].click()
+        r=self.pet.rest_reminder;self.advance(3601);self.assertEqual(r.card.buttons['later'].text(),'30 分钟后再提醒')
+        r.card.buttons['later'].click()
         self.assertFalse(r.active);self.assertEqual(r.due,self.now[0]+1800)
+
+    def test_later_uses_the_minutes_from_the_settings(self):
+        self.pet.set_option('rest_snooze_minutes',15);r=self.pet.rest_reminder;self.advance(3601)
+        self.assertEqual(r.card.buttons['later'].text(),'15 分钟后再提醒');r.card.buttons['later'].click()
+        due=r.due;self.assertEqual(due,self.now[0]+900)
+        # Changing the choice relabels the button but does not move a reminder that is already counting.
+        self.pet.set_option('rest_snooze_minutes',20);self.assertEqual(r.due,due);self.assertEqual(r.card.buttons['later'].text(),'20 分钟后再提醒')
+        self.advance(901);self.assertTrue(r.active);self.assertEqual(r.card.buttons['later'].text(),'20 分钟后再提醒')
+        r.card.buttons['later'].click();self.assertEqual(r.due,self.now[0]+1200)
+
+    def test_snooze_minutes_stay_in_range(self):
+        for value,expected in ((0,1),(10,10),(12.6,13),(999,240),('x',30),(None,30),(float('nan'),30)):
+            self.assertEqual(module.appearance(dict(appearance=dict(rest_snooze_minutes=value)))['rest_snooze_minutes'],expected,value)
+        self.assertEqual(module.appearance({})['rest_snooze_minutes'],30)
 
     def test_got_it_uses_the_interval_from_the_settings(self):
         self.pet.set_option('rest_interval_minutes',45);r=self.pet.rest_reminder;self.advance(2701);r.card.buttons['ok'].click()
@@ -368,6 +383,8 @@ class RestReminderTests(Base):
     def test_settings_rows(self):
         self.pet.open_preferences('桌面与声音');d=self.pet.preferences
         d.controls['rest_interval_minutes'].setValue(30);self.assertEqual(module.appearance(module.load_settings())['rest_interval_minutes'],30)
+        d.controls['rest_snooze_minutes'].setValue(20);self.assertEqual(module.appearance(module.load_settings())['rest_snooze_minutes'],20)
+        self.assertEqual(self.pet.rest_reminder.snooze_minutes(),20)
         d.controls['rest_reminder'].setChecked(False);self.assertFalse(module.appearance(module.load_settings())['rest_reminder']);d.hide()
 
 
