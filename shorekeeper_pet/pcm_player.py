@@ -5,6 +5,16 @@ from PySide6.QtMultimedia import QAudioSink,QAudioFormat,QMediaDevices,QAudio,QM
 from .paths import ROOT,AUDIO_SESSION_NAME,APPLICATION_ID
 from .windows_audio import set_session_identity
 
+# Silence played after every line. The sink reports Idle as soon as the last bytes are handed to the output
+# device, and stopping it then throws away what the device has not played yet (its buffer, about 250 ms, plus
+# any output latency), which clipped the end of every line. With this tail only silence is left at that moment.
+TAIL_SECONDS=0.4
+
+def with_tail(data,fmt,seconds=TAIL_SECONDS):
+    """Append silence (all-zero samples for Int16, Int32 and Float alike) in the sink's own format."""
+    frame=fmt.channelCount()*fmt.bytesPerSample()
+    return bytes(data)+bytes(round(fmt.sampleRate()*seconds)*frame)
+
 class PcmPlayer(QObject):
     mediaStatusChanged=Signal(object)
     errorOccurred=Signal(object,str)
@@ -61,6 +71,7 @@ class PcmPlayer(QObject):
                 values=np.stack([np.interp(positions,np.arange(len(values)),values[:,i]) for i in range(channels)],axis=1)
             dtype,scale={QAudioFormat.SampleFormat.Int16:('<i2',32767),QAudioFormat.SampleFormat.Float:('<f4',1),QAudioFormat.SampleFormat.Int32:('<i4',2147483647)}[target.sampleFormat()]
             data=(np.clip(values,-1,1)*scale).astype(dtype).tobytes(); fmt=target
+        data=with_tail(data,fmt)
         self.buffer=QBuffer(self); self.buffer.setData(QByteArray(data)); self.buffer.open(QIODevice.OpenModeFlag.ReadOnly)
         self.sink=QAudioSink(device,fmt,self); self.sink.setVolume(self._volume); self.sink.stateChanged.connect(self._state)
         self.running=True; self.sink.start(self.buffer)
