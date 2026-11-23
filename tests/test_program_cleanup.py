@@ -91,27 +91,40 @@ class PruneTests(unittest.TestCase):
 
 
 class ScheduleTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls): cls.app=QApplication.instance() or QApplication([])
+    """The schedule is driven by hand, so the result never depends on how busy the machine is."""
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory(); self.root=pathlib.Path(self.temp.name); self.timers=[]; self.runs=[]
+        cleanup.prune_later(self.root,'1.0.2',first=120_000,retry=900_000,schedule=lambda ms,fn:self.timers.append((ms,fn)),run=lambda:self.runs.append(1))
+
+    def tearDown(self): self.temp.cleanup()
+
+    def fire(self):
+        ms,fn=self.timers.pop(0); fn(); return ms
+
+    def test_the_cleanup_runs_two_minutes_after_start(self):
+        self.assertEqual(self.fire(),120_000); self.assertEqual(self.runs,[1]); self.assertEqual(self.timers,[])
 
     def test_the_cleanup_waits_for_a_running_update_then_tries_once_more(self):
-        from PySide6.QtCore import QEventLoop,QTimer
-        calls=[]
-        with tempfile.TemporaryDirectory() as temp, patch.object(cleanup,'prune',side_effect=lambda root,v:calls.append(v)):
-            root=pathlib.Path(temp); write(root/JOURNAL,b'{}')
-            cleanup.prune_later(root,'1.0.2',first=10,retry=50)
-            loop=QEventLoop(); QTimer.singleShot(30,lambda:((root/JOURNAL).unlink(),None)); QTimer.singleShot(300,loop.quit); loop.exec()
-            import time; time.sleep(.1)
-        self.assertEqual(calls,['1.0.2'])
+        write(self.root/JOURNAL,b'{}')
+        self.assertEqual(self.fire(),120_000); self.assertEqual(self.runs,[])
+        (self.root/JOURNAL).unlink()
+        self.assertEqual(self.fire(),900_000); self.assertEqual(self.runs,[1]); self.assertEqual(self.timers,[])
 
     def test_the_cleanup_is_skipped_for_good_when_an_update_never_ends(self):
-        from PySide6.QtCore import QEventLoop,QTimer
-        calls=[]
-        with tempfile.TemporaryDirectory() as temp, patch.object(cleanup,'prune',side_effect=lambda root,v:calls.append(v)):
-            root=pathlib.Path(temp); write(root/JOURNAL,b'{}')
-            cleanup.prune_later(root,'1.0.2',first=10,retry=20)
-            loop=QEventLoop(); QTimer.singleShot(200,loop.quit); loop.exec()
-        self.assertEqual(calls,[])
+        write(self.root/cleanup.LOCK,b'{}')
+        self.fire(); self.fire()
+        self.assertEqual(self.runs,[]); self.assertEqual(self.timers,[])
+
+    def test_the_real_schedule_uses_qt_timers_and_a_background_thread(self):
+        app=QApplication.instance() or QApplication([])
+        with patch('PySide6.QtCore.QTimer.singleShot') as single, patch.object(cleanup,'prune') as prune:
+            cleanup.prune_later(self.root,'1.0.2')
+            self.assertEqual(single.call_args[0][0],cleanup.FIRST_DELAY_MS)
+            single.call_args[0][1]()
+            for _ in range(50):
+                if prune.called: break
+                import time; time.sleep(.02)
+        prune.assert_called_once_with(self.root,'1.0.2')
 
 
 if __name__=='__main__':

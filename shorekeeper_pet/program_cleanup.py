@@ -138,12 +138,17 @@ def running_versions(root):
     return {os.path.basename(v) for v in found}
 
 
-def prune_later(root,running_version,first=FIRST_DELAY_MS,retry=RETRY_DELAY_MS):
-    """Schedule the cleanup on the Qt event loop; the removal itself runs on a background thread."""
-    from PySide6.QtCore import QTimer
+def prune_later(root,running_version,first=FIRST_DELAY_MS,retry=RETRY_DELAY_MS,schedule=None,run=None):
+    """Schedule the cleanup on the Qt event loop; the removal itself runs on a background thread.
+    schedule(ms, callback) and run() can be replaced (tests drive them by hand)."""
+    if schedule is None:
+        from PySide6.QtCore import QTimer
+        schedule=QTimer.singleShot
+    if run is None:
+        run=lambda:threading.Thread(target=prune,args=(root,running_version),daemon=True).start()
     def attempt(again):
         if busy(root):
-            if again: QTimer.singleShot(retry,lambda:attempt(False))
+            if again: schedule(retry,lambda:attempt(False))
             return
-        threading.Thread(target=prune,args=(root,running_version),daemon=True).start()
-    QTimer.singleShot(first,lambda:attempt(True))
+        run()
+    schedule(first,lambda:attempt(True))
