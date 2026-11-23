@@ -884,6 +884,10 @@ def main():
     health_timer=QTimer(); health_timer.timeout.connect(pet.write_health)
     if os.environ.get('SHOREKEEPER_UPDATE_TOKEN'): health_timer.start(1000)
     elif not args.preview and not args.smoke_test: health_timer.start(5000)
+    if not pet.offline and getattr(sys,'frozen',False):
+        # Older program versions and update snapshots are removed once this version runs and no update is in progress.
+        from .program_cleanup import prune_later
+        prune_later(ROOT,VERSION)
     if args.capture_after:
         (ROOT/'qa').mkdir(exist_ok=True)
         QTimer.singleShot(args.capture_after*1000,lambda:pet.grab().save(str(ROOT/'qa/live-preview.png')))
