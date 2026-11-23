@@ -13,7 +13,7 @@ from .order_list import OrderList
 from .previews import CardPreview
 
 class Jobs(QObject):
-    finished=Signal(str); failed=Signal(str)
+    finished=Signal(str); failed=Signal(str); progress=Signal(str)
 
 class Preferences(QDialog):
     def __init__(self,pet,catalog,assets,root):
@@ -136,7 +136,7 @@ class Preferences(QDialog):
         footer=QHBoxLayout(); self.status=QLabel('设置自动保存'); self.status.setWordWrap(True); footer.addWidget(self.status,1)
         close=QPushButton('完成'); close.setMinimumWidth(120); close.clicked.connect(self.hide); footer.addWidget(close); layout.addLayout(footer)
         self.wheel_guard=WheelGuard(self)
-        self.jobs=Jobs(); self.jobs.finished.connect(self.job_finished); self.jobs.failed.connect(self.job_failed)
+        self.jobs=Jobs(); self.jobs.finished.connect(self.job_finished); self.jobs.failed.connect(self.job_failed); self.jobs.progress.connect(self.status.setText)
         self.refresh_controls(); self.loading=False; self.apply_style()
     def showEvent(self,event):
         # Start on the tab bar, never inside a choice the keyboard or wheel could change by accident.
@@ -192,7 +192,7 @@ class Preferences(QDialog):
         for button in self.buttons: button.setEnabled(False)
         options=dict(self.pet.options)
         def run():
-            try:self.jobs.finished.emit(install(options))
+            try:self.jobs.finished.emit(install(options,progress=self.jobs.progress.emit))
             except Exception as error:self.jobs.failed.emit(str(error))
         threading.Thread(target=run,daemon=True).start()
     def combo(self,key,names):
